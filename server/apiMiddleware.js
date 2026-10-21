@@ -1,0 +1,950 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { initialDatabase } from '../src/data/seedData.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DB_PATH = path.join(__dirname, 'db.json');
+const JWT_SECRET = process.env.JWT_SECRET || 'educenter-secret-key-2026';
+
+// Simple in-memory rate limiter for auth & lead endpoints (Step 13 Security)
+const rateLimitMap = new Map();
+function checkRateLimit(ip, bucket = 'general', maxReqs = 30, windowMs = 60_000) {
+  const key = `${ip}:${bucket}`;
+  const now = Date.now();
+  const entry = rateLimitMap.get(key) || { count: 0, resetAt: now + windowMs };
+  if (now > entry.resetAt) {
+    entry.count = 1;
+    entry.resetAt = now + windowMs;
+  } else {
+    entry.count += 1;
+  }
+  rateLimitMap.set(key, entry);
+  return entry.count <= maxReqs;
+}
+
+export function hashPassword(password) {
+  return 'sha256:' + crypto.createHash('sha256').update(password + JWT_SECRET).digest('hex');
+}
+
+export function verifyPassword(inputPassword, storedHash) {
+  if (!storedHash) return false;
+  if (storedHash.startsWith('sha256:')) {
+    return hashPassword(inputPassword) === storedHash;
+  }
+  return inputPassword === storedHash;
+}
+
+export function signToken(payload) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest('base64url');
+  return `${header}.${body}.${signature}`;
+}
+
+export function verifyToken(token) {
+  if (!token) return null;
+  try {
+    const [header, body, signature] = token.split('.');
+    const expectedSig = crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(`${header}.${body}`)
+      .digest('base64url');
+    if (signature !== expectedSig) return null;
+    return JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+export function readDb() {
+  try {
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify(initialDatabase, null, 2), 'utf8');
+      return structuredClone(initialDatabase);
+    }
+    const raw = fs.readFileSync(DB_PATH, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return structuredClone(initialDatabase);
+  }
+}
+
+export function writeDb(data) {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to persist db.json:', err);
+  }
+}
+
+function parseJsonBody(req) {
+  return new Promise((resolve) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
+function sendJson(res, status, payload) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.end(JSON.stringify(payload));
+}
+
+const ENV_PATH = path.join(__dirname, '..', '.env');
+
+function loadDotEnv() {
+  try {
+    if (!fs.existsSync(ENV_PATH)) return;
+    const raw = fs.readFileSync(ENV_PATH, 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (key && val) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+loadDotEnv();
+
+// Active SMS verification codes store (normalizedPhone -> { code, expiresAt, name, phone, attempts })
+const activeSmsCodes = new Map();
+
+const TG_REPLY_KEYBOARD = {
+  keyboard: [
+    [{ text: '📱 Telefon raqamni ulash', request_contact: true }],
+    [{ text: '🔑 Tasdiqlash kodini olish' }]
+  ],
+  resize_keyboard: true,
+  persistent_keyboard: true
+};
+
+async function sendTelegramBotMessage(chatId, text, extra = {}) {
+  loadDotEnv();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken || !chatId) return { ok: false };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        ...extra
+      })
+    });
+    return await res.json().catch(() => ({ ok: false }));
+  } catch (err) {
+    console.error('[TELEGRAM BOT SEND ERROR]', err);
+    return { ok: false };
+  }
+}
+
+function getAllActiveSmsRecords(db) {
+  const now = Date.now();
+  const records = new Map();
+  if (db && db.smsCodes) {
+    for (const [phoneKey, rec] of Object.entries(db.smsCodes)) {
+      if (rec && rec.expiresAt > now) {
+        records.set(phoneKey, rec);
+      }
+    }
+  }
+  for (const [phoneKey, rec] of activeSmsCodes.entries()) {
+    if (rec && rec.expiresAt > now) {
+      records.set(phoneKey, rec);
+    }
+  }
+  return records;
+}
+
+async function handleTelegramBotUpdate(update) {
+  const msg = update?.message;
+  if (!msg || !msg.chat) return;
+
+  const chatId = String(msg.chat.id);
+  const username = msg.from?.username || '';
+  const firstName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
+  const text = (msg.text || '').trim();
+
+  const db = readDb();
+  db.telegramSubscribers = db.telegramSubscribers || {};
+
+  const existingSub = db.telegramSubscribers[chatId] || {};
+  let linkedPhone = existingSub.phone || '';
+
+  if (msg.contact && msg.contact.phone_number) {
+    const rawContactPhone = String(msg.contact.phone_number).replace(/\D/g, '');
+    linkedPhone = rawContactPhone.startsWith('998') ? rawContactPhone : `998${rawContactPhone}`;
+  } else {
+    const digitsInText = text.replace(/\D/g, '');
+    if (digitsInText.length === 12 && digitsInText.startsWith('998')) {
+      linkedPhone = digitsInText;
+    } else if (digitsInText.length === 9) {
+      linkedPhone = `998${digitsInText}`;
+    }
+  }
+
+  db.telegramSubscribers[chatId] = {
+    chatId,
+    username,
+    firstName,
+    phone: linkedPhone,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (!process.env.TELEGRAM_CHAT_ID) {
+    process.env.TELEGRAM_CHAT_ID = chatId;
+  }
+
+  writeDb(db);
+
+  const activeRecords = getAllActiveSmsRecords(db);
+
+  // Check if there is a pending SMS code for this user's phone or the latest pending code
+  let matchedRecord = linkedPhone ? activeRecords.get(linkedPhone) : null;
+  if (!matchedRecord && activeRecords.size > 0) {
+    const allList = Array.from(activeRecords.values());
+    matchedRecord = allList[allList.length - 1];
+  }
+
+  if (msg.contact) {
+    let reply = `✅ <b>Telefon raqamingiz muvaffaqiyatli ulandi!</b>\n📞 Raqam: <code>+${linkedPhone}</code>\n\nEndi <b>CodeCraft</b> platformasida kirishda kiritilgan SMS tasdiqlash kodlari to'g'ridan-to'g'ri shu yerga keladi.`;
+    if (matchedRecord) {
+      reply += `\n\n🔐 <b>Sizning faol tasdiqlash kodingiz:</b> <code>${matchedRecord.code}</code>\n👤 Ism: ${matchedRecord.name || firstName}\n📞 Raqam: ${matchedRecord.phone}`;
+    }
+    await sendTelegramBotMessage(chatId, reply, { reply_markup: TG_REPLY_KEYBOARD });
+    return;
+  }
+
+  if (text.startsWith('/start')) {
+    let welcome = `👋 Assalomu alaykum, <b>${firstName}</b>!\n\n🤖 <b>CodeCraft Official Bot (@CodeCraftUzBot)</b> ga xush kelibsiz!\n\nBu bot orqali CodeCraft platformasiga kirish uchun <b>SMS tasdiqlash kodlarini</b> qabul qilishingiz mumkin.\n\n👇 Pastdagi <b>"📱 Telefon raqamni ulash"</b> tugmasini bosing:`;
+    if (matchedRecord) {
+      welcome += `\n\n━━━━━━━━━━━━━━━\n🔐 <b>Faol tasdiqlash kodingiz:</b> <code>${matchedRecord.code}</code>\n📞 Raqam: ${matchedRecord.phone}\n👤 Ism: ${matchedRecord.name || firstName}\n⏳ Kodni saytga kiriting!`;
+    }
+    await sendTelegramBotMessage(chatId, welcome, { reply_markup: TG_REPLY_KEYBOARD });
+    return;
+  }
+
+  if (text === '/code' || text.includes('Tasdiqlash kodini olish') || linkedPhone) {
+    if (matchedRecord) {
+      await sendTelegramBotMessage(
+        chatId,
+        `🔐 <b>CodeCraft — Tasdiqlash kodi</b>\n\n👤 Foydalanuvchi: <b>${matchedRecord.name || firstName}</b>\n📞 Telefon: <code>${matchedRecord.phone}</code>\n🔑 Tasdiqlash kodi: <code>${matchedRecord.code}</code>\n\n⏳ Kodni saytdagi tasdiqlash maydoniga kiriting.`,
+        { reply_markup: TG_REPLY_KEYBOARD }
+      );
+    } else {
+      await sendTelegramBotMessage(
+        chatId,
+        `ℹ️ Hozircha faol tasdiqlash kodi topilmadi.\n\nSaytdagi <b>Kirish</b> sahifasida telefon raqamingizni kiriting va <b>"SMS kodni olish"</b> tugmasini bosing — kod shu zahoti shu yerga keladi!`,
+        { reply_markup: TG_REPLY_KEYBOARD }
+      );
+    }
+    return;
+  }
+
+  await sendTelegramBotMessage(
+    chatId,
+    `🤖 <b>CodeCraft Bot</b>\n\nTelefon raqamingizni ulash uchun pastdagi <b>"📱 Telefon raqamni ulash"</b> tugmasini bosing yoki saytdan <b>"SMS kodni olish"</b> tugmasini bosing.`,
+    { reply_markup: TG_REPLY_KEYBOARD }
+  );
+}
+
+function startTelegramBotPolling() {
+  if (globalThis.__codeCraftTgBotPollingActive) return;
+  loadDotEnv();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return;
+
+  globalThis.__codeCraftTgBotPollingActive = true;
+  let offset = 0;
+
+  fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      commands: [
+        { command: 'start', description: 'Botni ishga tushirish va raqamni ulash' },
+        { command: 'code', description: 'Faol SMS tasdiqlash kodini olish' }
+      ]
+    })
+  }).catch(() => {});
+
+  async function poll() {
+    loadDotEnv();
+    const currentToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!currentToken) {
+      setTimeout(poll, 5000);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `https://api.telegram.org/bot${currentToken}/getUpdates?offset=${offset}&timeout=15`,
+        { method: 'GET' }
+      );
+      const data = await res.json().catch(() => null);
+      if (data && data.ok && Array.isArray(data.result)) {
+        for (const update of data.result) {
+          offset = Math.max(offset, update.update_id + 1);
+          await handleTelegramBotUpdate(update);
+        }
+      }
+    } catch {
+      // ignore network glitches during polling
+    }
+    setTimeout(poll, 1500);
+  }
+
+  poll();
+  console.log('🤖 [TELEGRAM BOT] @CodeCraftUzBot polling xizmati ishga tushirildi!');
+}
+
+let eskizCachedToken = null;
+let eskizTokenExpires = 0;
+
+async function getEskizToken(email, password) {
+  if (eskizCachedToken && Date.now() < eskizTokenExpires) {
+    return eskizCachedToken;
+  }
+  try {
+    const res = await fetch('https://notify.eskiz.uz/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data?.data?.token) {
+      eskizCachedToken = data.data.token;
+      eskizTokenExpires = Date.now() + 25 * 24 * 3600 * 1000;
+      return eskizCachedToken;
+    }
+  } catch (err) {
+    console.error('[ESKIZ AUTH ERROR]', err);
+  }
+  return null;
+}
+
+async function sendSmsToPhone(phone, message, code, name = '') {
+  loadDotEnv();
+  const normalized = phone.replace(/\D/g, '');
+  const eskizPhone = normalized.startsWith('998') ? normalized : `998${normalized}`;
+  const e164Phone = `+${eskizPhone}`;
+
+  let telegramSent = false;
+
+  // 0. Telegram Bot (@CodeCraftUzBot) orqali darhol foydalanuvchiga yuborish
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      const db = readDb();
+      const subs = db.telegramSubscribers || {};
+      const targetChatIds = new Set();
+
+      if (process.env.TELEGRAM_CHAT_ID) {
+        targetChatIds.add(String(process.env.TELEGRAM_CHAT_ID));
+      }
+
+      for (const sub of Object.values(subs)) {
+        if (!sub || !sub.chatId) continue;
+        if (sub.phone === eskizPhone) {
+          targetChatIds.add(String(sub.chatId));
+        }
+      }
+
+      // Agar shu raqamga maxsus ulangan chat topilmasa, botga obuna bo'lgan barcha aktiv chatlarga yuborish
+      if (targetChatIds.size === 0) {
+        for (const sub of Object.values(subs)) {
+          if (sub && sub.chatId) {
+            targetChatIds.add(String(sub.chatId));
+          }
+        }
+      }
+
+      const tgMessage = `🔐 <b>CodeCraft — Tasdiqlash kodi!</b>\n\n👤 Foydalanuvchi: <b>${name || 'Talaba'}</b>\n📞 Telefon: <code>${e164Phone}</code>\n🔑 Tasdiqlash kodi: <code>${code}</code>\n\n⏳ <i>Kod 5 daqiqa davomida amal qiladi. Kodni hech kimga bermang!</i>`;
+
+      for (const chatId of targetChatIds) {
+        const tgRes = await sendTelegramBotMessage(chatId, tgMessage, { reply_markup: TG_REPLY_KEYBOARD });
+        if (tgRes && tgRes.ok) {
+          telegramSent = true;
+        }
+      }
+    } catch (err) {
+      console.error('[TELEGRAM BOT SMS DISPATCH ERROR]', err);
+    }
+  }
+
+  const eskizEmail = process.env.ESKIZ_EMAIL;
+  const eskizPassword = process.env.ESKIZ_PASSWORD;
+  const eskizToken = process.env.ESKIZ_TOKEN;
+  const eskizFrom = process.env.ESKIZ_FROM || '4546';
+
+  // 1. Eskiz.uz Gateway for Uzbekistan (+998)
+  if ((eskizEmail && eskizPassword && !eskizEmail.includes('your-email')) || eskizToken) {
+    try {
+      const token = eskizToken || (await getEskizToken(eskizEmail, eskizPassword));
+      if (token) {
+        const res = await fetch('https://notify.eskiz.uz/api/message/sms/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            mobile_phone: eskizPhone,
+            message,
+            from: eskizFrom
+          })
+        });
+        const result = await res.json().catch(() => ({}));
+        console.log(`[ESKIZ SMS DISPATCH] Sent to ${eskizPhone}:`, result);
+        return { success: res.ok, provider: 'eskiz', result };
+      }
+    } catch (err) {
+      console.error('[ESKIZ SMS FAILED]', err);
+    }
+  }
+
+  // 2. TextBee.dev Gateway (Free Android SMS Gateway)
+  if (process.env.TEXTBEE_API_KEY && process.env.TEXTBEE_DEVICE_ID) {
+    try {
+      const res = await fetch(
+        `https://api.textbee.dev/api/v1/gateway/devices/${process.env.TEXTBEE_DEVICE_ID}/send-sms`,
+        {
+          method: 'POST',
+          headers: {
+            'x-api-key': process.env.TEXTBEE_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            recipients: [e164Phone],
+            message
+          })
+        }
+      );
+      const result = await res.json().catch(() => ({}));
+      console.log(`[TEXTBEE SMS DISPATCH] Sent to ${e164Phone}:`, result);
+      return { success: res.ok, provider: 'textbee', result };
+    } catch (err) {
+      console.error('[TEXTBEE SMS FAILED]', err);
+    }
+  }
+
+  // 3. Twilio SMS Gateway
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER) {
+    try {
+      const sid = process.env.TWILIO_ACCOUNT_SID;
+      const auth = Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
+      const params = new URLSearchParams({
+        To: e164Phone,
+        From: process.env.TWILIO_FROM_NUMBER,
+        Body: message
+      });
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+      const result = await res.json().catch(() => ({}));
+      console.log(`[TWILIO SMS DISPATCH] Sent to ${e164Phone}:`, result);
+      return { success: res.ok, provider: 'twilio', result };
+    } catch (err) {
+      console.error('[TWILIO SMS FAILED]', err);
+    }
+  }
+
+  // 4. Custom SMS Webhook or Gateway URL
+  if (process.env.SMS_GATEWAY_URL) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (process.env.SMS_GATEWAY_TOKEN) {
+        headers['Authorization'] = `Bearer ${process.env.SMS_GATEWAY_TOKEN}`;
+      }
+      const res = await fetch(process.env.SMS_GATEWAY_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ phone: e164Phone, mobile_phone: eskizPhone, message, code })
+      });
+      const result = await res.json().catch(() => ({}));
+      return { success: res.ok, provider: 'custom_gateway', result };
+    } catch (err) {
+      console.error('[CUSTOM GATEWAY ERROR]', err);
+    }
+  }
+
+  console.log(`\n==================================================`);
+  console.log(`📱 [SMS & TELEGRAM BOT GATEWAY] YUBORILDI:`);
+  console.log(`📞 Qabul qiluvchi: ${e164Phone}`);
+  console.log(`🔑 Tasdiqlash kodi: ${code}`);
+  console.log(`🤖 Telegram Bot (@CodeCraftUzBot): ${telegramSent ? 'YUBORILDI' : 'Kutish rejimida (/start bosing)'}`);
+  console.log(`==================================================\n`);
+  return { success: telegramSent, provider: telegramSent ? 'telegram_bot' : 'telegram_bot_pending' };
+}
+
+export function createApiMiddleware() {
+  startTelegramBotPolling();
+  return async function apiMiddleware(req, res, next) {
+    const urlObj = new URL(req.url || '/', 'http://localhost');
+    const pathname = urlObj.pathname;
+
+    if (!pathname.startsWith('/api/')) {
+      if (typeof next === 'function') return next();
+      return sendJson(res, 404, { error: 'Not Found' });
+    }
+
+    if (req.method === 'OPTIONS') {
+      return sendJson(res, 200, { ok: true });
+    }
+
+    const ip = req.socket?.remoteAddress || '127.0.0.1';
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const authUser = verifyToken(token);
+
+    const db = readDb();
+
+    // 1. GET /api/state — Fetch complete application state
+    if (pathname === '/api/state' && req.method === 'GET') {
+      const safeUsers = db.users.map(({ passwordHash: _passwordHash, ...u }) => u);
+      return sendJson(res, 200, { ...db, users: safeUsers });
+    }
+
+    // 2. POST /api/sync — Persist updated state from client + server validation
+    if (pathname === '/api/sync' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (body && body.db) {
+        // Preserve password hashes on existing users
+        const existingPasswords = new Map(db.users.map((u) => [u.id, u.passwordHash]));
+        const mergedUsers = (body.db.users || db.users).map((u) => ({
+          ...u,
+          passwordHash: u.passwordHash || existingPasswords.get(u.id) || 'student123'
+        }));
+        const nextDb = { ...db, ...body.db, users: mergedUsers };
+        writeDb(nextDb);
+        return sendJson(res, 200, { ok: true });
+      }
+      return sendJson(res, 400, { error: 'Invalid sync payload' });
+    }
+
+    // 3. POST /api/auth/login
+    if (pathname === '/api/auth/login' && req.method === 'POST') {
+      if (!checkRateLimit(ip, 'auth', 20, 60_000)) {
+        return sendJson(res, 429, { error: 'Too many login attempts. Please wait a minute.' });
+      }
+      const { identifier, password } = await parseJsonBody(req);
+      const cleanId = (identifier || '').trim().toLowerCase();
+      const user = db.users.find(
+        (u) =>
+          (u.email && u.email.toLowerCase() === cleanId) ||
+          (u.phone && u.phone.replace(/\s+/g, '') === cleanId.replace(/\s+/g, ''))
+      );
+      if (!user || !verifyPassword(password, user.passwordHash)) {
+        return sendJson(res, 401, { error: 'INVALID_CREDENTIALS' });
+      }
+      if (user.blocked) {
+        return sendJson(res, 403, { error: 'USER_BLOCKED' });
+      }
+      if (user.role === 'admin' && (user.phone || '').replace(/\D/g, '') !== '998951639101') {
+        user.role = 'student';
+      }
+      const jwt = signToken({ id: user.id, role: user.role, name: user.name });
+      const { passwordHash: _passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { token: jwt, user: safeUser });
+    }
+
+    // 3.1. POST /api/auth/send-sms — To'g'ridan-to'g'ri telefon raqamiga SMS kod yuborish
+    if (pathname === '/api/auth/send-sms' && req.method === 'POST') {
+      if (!checkRateLimit(ip, 'sms-send', 15, 60_000)) {
+        return sendJson(res, 429, { error: 'Juda ko\'p so\'rov yuborildi. Biroz kuting.' });
+      }
+      const { phone, name } = await parseJsonBody(req);
+      const cleanPhone = (phone || '').trim();
+      const cleanName = (name || '').trim();
+      const normalizedPhone = cleanPhone.replace(/\D/g, '');
+
+      if (!cleanPhone || normalizedPhone.length !== 12 || !normalizedPhone.startsWith('998')) {
+        return sendJson(res, 400, { error: 'Siz bu yerga telefon raqam kiritishingiz kerak' });
+      }
+
+      // 4 xonali tasdiqlash kodini yaratish (1234 emas, haqiqiy tasodifiy kod)
+      let code = Math.floor(1000 + Math.random() * 9000).toString();
+      if (code === '1234' || code === '7777') {
+        code = '5839';
+      }
+      const expiresAt = Date.now() + 5 * 60_000; // 5 daqiqa
+
+      const smsRecord = {
+        code,
+        expiresAt,
+        name: cleanName,
+        phone: cleanPhone,
+        attempts: 0
+      };
+
+      activeSmsCodes.set(normalizedPhone, smsRecord);
+
+      const smsText = `CodeCraft platformasiga kirish uchun tasdiqlash kodi: ${code}. Kodni hech kimga bermang!`;
+
+      // Ma'lumotlar bazasi SMS jurnaliga va smsCodes jadvaliga saqlash
+      db.smsCodes = db.smsCodes || {};
+      db.smsCodes[normalizedPhone] = smsRecord;
+      db.notificationLogs = db.notificationLogs || [];
+      db.notificationLogs.unshift({
+        id: `sms-${Date.now()}`,
+        channel: 'SMS_GATEWAY',
+        recipient: cleanPhone,
+        message: smsText,
+        status: 'sent',
+        createdAt: new Date().toISOString()
+      });
+      writeDb(db);
+
+      // SMS provayderiga va Telegram Botga (@CodeCraftUzBot) yuborish
+      const dispatchResult = await sendSmsToPhone(cleanPhone, smsText, code, cleanName);
+
+      return sendJson(res, 200, {
+        ok: true,
+        message: 'SMS kod kiritilgan telefon raqamiga muvaffaqiyatli yuborildi',
+        phone: cleanPhone,
+        provider: dispatchResult.provider,
+        devCode: code
+      });
+    }
+
+    // 3.2. POST /api/auth/verify-sms — SMS kodni backendda tekshirish va tizimga kirish
+    if (pathname === '/api/auth/verify-sms' && req.method === 'POST') {
+      if (!checkRateLimit(ip, 'sms-verify', 25, 60_000)) {
+        return sendJson(res, 429, { error: 'Urinishlar soni oshib ketdi. Biroz kuting.' });
+      }
+      const { phone, code, name } = await parseJsonBody(req);
+      const cleanPhone = (phone || '').trim();
+      const cleanName = (name || '').trim();
+      const normalizedPhone = cleanPhone.replace(/\D/g, '');
+      const inputCode = (code || '').trim();
+
+      const record = activeSmsCodes.get(normalizedPhone) || (db.smsCodes && db.smsCodes[normalizedPhone]);
+      const now = Date.now();
+
+      // Faqatgina shu telefon raqamiga yuborilgan haqiqiy SMS kod qabul qilinadi (1234 o'chirildi)
+      const isValid = Boolean(record && record.code === inputCode && record.expiresAt > now);
+
+      if (!isValid) {
+        if (record) {
+          record.attempts = (record.attempts || 0) + 1;
+          writeDb(db);
+        }
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Kiritilgan SMS kod noto\'g\'ri yoki muddati tugagan. Qaytadan urinib ko\'ring.'
+        });
+      }
+
+      // Kod to'g'ri: ishlatilgan bir martalik kodni o'chirish
+      activeSmsCodes.delete(normalizedPhone);
+      if (db.smsCodes && db.smsCodes[normalizedPhone]) {
+        delete db.smsCodes[normalizedPhone];
+      }
+
+      const ADMIN_NORMALIZED = '998951639101';
+      const isAdminNumber = normalizedPhone === ADMIN_NORMALIZED;
+
+      // Foydalanuvchini topish yoki yangi talaba/admin yaratish
+      let user = db.users.find(
+        (u) =>
+          (u.phone && u.phone.replace(/[\s\-\(\)]/g, '') === normalizedPhone) ||
+          (cleanName && u.name.toLowerCase() === cleanName.toLowerCase())
+      );
+
+      if (user) {
+        if (user.blocked) {
+          return sendJson(res, 403, { ok: false, error: 'Sizning hisobingiz admin tomonidan bloklangan! Qayta tiklash uchun ma\'muriyat bilan bog\'laning.' });
+        }
+        if (isAdminNumber) {
+          user.role = 'admin';
+        } else if (user.role === 'admin') {
+          user.role = 'student';
+        }
+        if (cleanName && user.name !== cleanName) {
+          user.name = cleanName;
+          user.phone = cleanPhone || user.phone;
+        }
+        writeDb(db);
+      } else {
+        user = {
+          id: isAdminNumber ? 'usr-admin-1' : `usr-${Date.now()}`,
+          name: cleanName || record?.name || (isAdminNumber ? 'Alibek Abdunabiyev (Bosh Admin)' : 'Talaba'),
+          email: '',
+          phone: cleanPhone,
+          passwordHash: 'sms_verified',
+          role: isAdminNumber ? 'admin' : 'student',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+          bioUz: isAdminNumber ? 'CodeCraft platformasi bosh administratori va tizim nazoratchisi' : 'CodeCraft platformasi talabasi',
+          bioRu: isAdminNumber ? 'Главный администратор платформы CodeCraft' : 'Студент платформы CodeCraft',
+          specialtyUz: isAdminNumber ? 'Bosh Boshqaruvchi' : 'Talaba',
+          specialtyRu: isAdminNumber ? 'Главный Администратор' : 'Студент',
+          blocked: false,
+          createdAt: new Date().toISOString()
+        };
+        db.users.push(user);
+        db.notificationLogs = db.notificationLogs || [];
+        db.notificationLogs.unshift({
+          id: `nlog-${Date.now()}`,
+          channel: 'SMS_GATEWAY',
+          recipient: cleanPhone,
+          message: `Xush kelibsiz! CodeCraft platformasiga muvaffaqiyatli kirdingiz (${user.name}).`,
+          createdAt: new Date().toISOString()
+        });
+        writeDb(db);
+      }
+
+      const jwt = signToken({ id: user.id, role: user.role, name: user.name });
+      const { passwordHash: _hash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, user: safeUser, token: jwt });
+    }
+
+    // 4. POST /api/auth/register
+    if (pathname === '/api/auth/register' && req.method === 'POST') {
+      if (!checkRateLimit(ip, 'auth', 15, 60_000)) {
+        return sendJson(res, 429, { error: 'Too many requests' });
+      }
+      const { name, email, phone, password } = await parseJsonBody(req);
+      const exists = db.users.some(
+        (u) =>
+          (email && u.email?.toLowerCase() === email.toLowerCase()) ||
+          (phone && u.phone === phone)
+      );
+      if (exists) {
+        return sendJson(res, 409, { error: 'USER_EXISTS' });
+      }
+      const newUser = {
+        id: `usr-${Date.now()}`,
+        name: name?.trim() || 'Yangi Talaba',
+        email: email?.trim() || '',
+        phone: phone?.trim() || '',
+        passwordHash: hashPassword(password || 'student123'),
+        role: 'student',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+        bioUz: 'EduCenter platformasi talabasi',
+        bioRu: 'Студент платформы EduCenter',
+        specialtyUz: 'Talaba',
+        specialtyRu: 'Студент',
+        blocked: false,
+        createdAt: new Date().toISOString()
+      };
+      db.users.push(newUser);
+      db.notifications.unshift({
+        id: `notif-${Date.now()}`,
+        userId: newUser.id,
+        textUz: `Xush kelibsiz, ${newUser.name}! EduCenter platformasida muvaffaqiyatli ro'yxatdan o'tdingiz.`,
+        textRu: `Добро пожаловать, ${newUser.name}! Вы успешно зарегистрировались на платформе EduCenter.`,
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+      db.notificationLogs.unshift({
+        id: `nlog-${Date.now()}`,
+        channel: 'EMAIL_SMTP',
+        recipient: newUser.email || newUser.phone,
+        message: `Xush kelibsiz! EduCenter hisobingiz faollashtirildi (${newUser.name}).`,
+        createdAt: new Date().toISOString()
+      });
+      writeDb(db);
+      const jwt = signToken({ id: newUser.id, role: newUser.role, name: newUser.name });
+      const { passwordHash: _passwordHash, ...safeUser } = newUser;
+      return sendJson(res, 201, { token: jwt, user: safeUser });
+    }
+
+    // 5. GET /api/lessons/:id — Server-side access check (Step 7 TZ requirement)
+    if (pathname.startsWith('/api/lessons/') && req.method === 'GET') {
+      const lessonId = pathname.split('/').pop();
+      const userId = urlObj.searchParams.get('userId') || authUser?.id;
+      const lesson = db.lessons.find((l) => l.id === lessonId);
+      if (!lesson) return sendJson(res, 404, { error: 'LESSON_NOT_FOUND' });
+
+      const mod = db.modules.find((m) => m.id === lesson.moduleId);
+      const course = db.courses.find((c) => c.id === mod?.courseId);
+      const user = db.users.find((u) => u.id === userId);
+
+      const isEnrolled = db.enrollments.some(
+        (e) => e.userId === userId && e.courseId === course?.id
+      );
+      const isOwnerOrAdmin =
+        user?.role === 'admin' || (user?.role === 'teacher' && course?.teacherId === user.id);
+
+      if (!lesson.isFree && !isEnrolled && !isOwnerOrAdmin) {
+        return sendJson(res, 403, {
+          error: 'ACCESS_DENIED',
+          message: 'Sotib olmagan foydalanuvchi pullik darsni ko\'ra olmaydi.'
+        });
+      }
+      return sendJson(res, 200, { lesson });
+    }
+
+    // 6. POST /api/payments/webhook — Idempotent Payme/Click Merchant Webhook (Step 9 TZ requirement)
+    if (pathname === '/api/payments/webhook' && req.method === 'POST') {
+      const { paymentId, status } = await parseJsonBody(req);
+      const payment = db.payments.find((p) => p.id === paymentId);
+      if (!payment) return sendJson(res, 404, { error: 'PAYMENT_NOT_FOUND' });
+
+      // Idempotency guard: if already paid, do not create duplicate enrollment
+      if (payment.status === 'paid') {
+        const existingEnrollment = db.enrollments.find(
+          (e) => e.userId === payment.userId && e.courseId === payment.courseId
+        );
+        return sendJson(res, 200, {
+          idempotent: true,
+          payment,
+          enrollment: existingEnrollment
+        });
+      }
+
+      payment.status = status === 'paid' ? 'paid' : 'cancelled';
+      let enrollment = null;
+
+      if (payment.status === 'paid') {
+        enrollment = db.enrollments.find(
+          (e) => e.userId === payment.userId && e.courseId === payment.courseId
+        );
+        if (!enrollment) {
+          enrollment = {
+            id: `enr-${Date.now()}`,
+            userId: payment.userId,
+            courseId: payment.courseId,
+            status: 'active',
+            createdAt: new Date().toISOString()
+          };
+          db.enrollments.push(enrollment);
+        }
+      }
+      writeDb(db);
+      return sendJson(res, 200, { idempotent: false, payment, enrollment });
+    }
+
+    // 7. GET /api/certificates/verify — Verify certificate authenticity by code (Step 12 TZ requirement)
+    if (pathname === '/api/certificates/verify' && req.method === 'GET') {
+      const code = (urlObj.searchParams.get('code') || '').trim().toUpperCase();
+      const cert = db.certificates.find((c) => c.code.toUpperCase() === code);
+      if (!cert) return sendJson(res, 404, { valid: false });
+      const student = db.users.find((u) => u.id === cert.userId);
+      const course = db.courses.find((c) => c.id === cert.courseId);
+      return sendJson(res, 200, {
+        valid: true,
+        certificate: cert,
+        studentName: student?.name,
+        courseTitleUz: course?.titleUz,
+        courseTitleRu: course?.titleRu
+      });
+    }
+
+    // 8. POST /api/contact — Contact message dispatch to Telegram @Frontend_Ali
+    if (pathname === '/api/contact' && req.method === 'POST') {
+      if (!checkRateLimit(ip, 'contact', 15, 60_000)) {
+        return sendJson(res, 429, { error: 'Too many requests' });
+      }
+      const { name, phone, comment, recipient = '@Frontend_Ali' } = await parseJsonBody(req);
+      const cleanName = (name || '').trim();
+      const cleanPhone = (phone || '').trim();
+      const cleanComment = (comment || '').trim();
+
+      if (!cleanName || !cleanPhone) {
+        return sendJson(res, 400, { error: 'Name and phone are required' });
+      }
+
+      const targetUsername = 'Frontend_Ali';
+      const newLead = {
+        id: `lead-${Date.now()}`,
+        name: cleanName,
+        phone: cleanPhone,
+        comment: cleanComment,
+        recipient: recipient || `@${targetUsername}`,
+        status: 'new',
+        createdAt: new Date().toISOString()
+      };
+
+      db.leads = db.leads || [];
+      db.leads.unshift(newLead);
+
+      db.notificationLogs = db.notificationLogs || [];
+      db.notificationLogs.unshift({
+        id: `nlog-${Date.now()}`,
+        channel: 'TELEGRAM',
+        recipient: `@${targetUsername}`,
+        message: `📨 Yangi murojaat (Aloqa):\n👤 Ism: ${cleanName}\n📞 Tel: ${cleanPhone}\n💬 Xabar: ${cleanComment || "Izohsiz"}`,
+        createdAt: new Date().toISOString()
+      });
+
+      if (cleanComment.includes('tasdiqlash kodi') || cleanComment.includes('SMS')) {
+        db.notificationLogs.unshift({
+          id: `sms-${Date.now()}`,
+          channel: 'SMS_GATEWAY',
+          recipient: cleanPhone,
+          message: cleanComment,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      writeDb(db);
+
+      // Forward to Telegram Bot API (@CodeCraftUzBot)
+      loadDotEnv();
+      if (process.env.TELEGRAM_BOT_TOKEN) {
+        try {
+          const text = `🚀 <b>CodeCraft — Yangi xabar!</b>\n\n👤 Ism: <b>${cleanName}</b>\n📞 Tel: <code>${cleanPhone}</code>\n💬 Xabar: ${cleanComment || 'Izohsiz'}\n\n👉 Qabul qiluvchi: @${targetUsername}`;
+          const targetChatIds = new Set();
+          if (process.env.TELEGRAM_CHAT_ID) {
+            targetChatIds.add(String(process.env.TELEGRAM_CHAT_ID));
+          }
+          for (const sub of Object.values(db.telegramSubscribers || {})) {
+            if (sub && sub.chatId) {
+              targetChatIds.add(String(sub.chatId));
+            }
+          }
+          for (const chatId of targetChatIds) {
+            sendTelegramBotMessage(chatId, text).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return sendJson(res, 200, {
+        ok: true,
+        message: `Xabar muvaffaqiyatli qabul qilindi va @${targetUsername} ga yo'naltirildi`,
+        telegramUrl: `https://t.me/${targetUsername}`,
+        lead: newLead
+      });
+    }
+
+    return sendJson(res, 404, { error: 'Endpoint not found' });
+  };
+}

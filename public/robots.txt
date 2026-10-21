@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /teacher
+Disallow: /dashboard
+
+Sitemap: https://educenter.uz/sitemap.xml
