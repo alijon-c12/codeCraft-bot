@@ -14,6 +14,8 @@ export function StudentDashboardPage() {
     setActiveCertificate,
     updateProfile,
     markNotificationsRead,
+    deleteNotification,
+    clearAllNotifications,
     showToast,
     submitAssignment,
     sendChatMessage,
@@ -33,9 +35,12 @@ export function StudentDashboardPage() {
   if (!currentUser) return null;
 
   const myEnrollments = db.enrollments.filter((e) => e.userId === currentUser.id);
-  const myCourses = myEnrollments
-    .map((e) => db.courses.find((c) => c.id === e.courseId))
-    .filter(Boolean);
+  const hasAllAccess = myEnrollments.some((e) => e.courseId === 'all');
+  const myCourses = hasAllAccess
+    ? db.courses
+    : myEnrollments
+        .map((e) => db.courses.find((c) => c.id === e.courseId))
+        .filter(Boolean);
   const mySubmissions = db.submissions.filter((s) => s.userId === currentUser.id);
   const myCertificates = db.certificates.filter((c) => c.userId === currentUser.id);
   const myPayments = db.payments.filter((p) => p.userId === currentUser.id);
@@ -529,7 +534,6 @@ export function StudentDashboardPage() {
                     <th>{lang === 'ru' ? 'ID транзакции' : 'Tranzaksiya ID'}</th>
                     <th>{lang === 'ru' ? 'Курс' : 'Kurs'}</th>
                     <th>{lang === 'ru' ? 'Платежная система' : "To'lov tizimi"}</th>
-                    <th>{lang === 'ru' ? 'Промокод' : 'Promo-kod'}</th>
                     <th>{lang === 'ru' ? 'Сумма' : 'Summa'}</th>
                     <th>{lang === 'ru' ? 'Статус' : 'Holati'}</th>
                     <th>{lang === 'ru' ? 'Дата' : 'Sana'}</th>
@@ -537,19 +541,22 @@ export function StudentDashboardPage() {
                 </thead>
                 <tbody>
                   {myPayments.map((pay) => {
-                    const crs = db.courses.find((c) => c.id === pay.courseId);
+                    const crs = pay.courseId === 'all'
+                      ? { titleUz: "Barcha umumiy kurslar to'plami (Full Bundle)", titleRu: "Полный доступ ко всем курсам (Full Bundle)" }
+                      : db.courses.find((c) => c.id === pay.courseId);
                     return (
                       <tr key={pay.id}>
                         <td><code>{pay.transactionId}</code></td>
                         <td>{loc(crs, 'title')}</td>
                         <td><span className="role-badge">{pay.provider.toUpperCase()}</span></td>
-                        <td>{pay.promoCode ? <code>{pay.promoCode}</code> : '—'}</td>
                         <td><strong>{formatPrice(pay.amount)}</strong></td>
                         <td>
                           <span className={`status-pill ${pay.status}`}>
                             {pay.status === 'paid'
-                              ? (lang === 'ru' ? 'ОПЛАЧЕНО' : "TO'LANGAN")
-                              : pay.status.toUpperCase()}
+                              ? (lang === 'ru' ? "✅ ОПЛАЧЕНО (КУРС ОТКРЫТ)" : "✅ TO'LANGAN (KURS OCHIQ)")
+                              : pay.status === 'pending'
+                              ? (lang === 'ru' ? "⏳ ПРОВЕРЯЕТСЯ (ОЖИДАНИЕ ЗАЧИСЛЕНИЯ)" : "⏳ TEKSHIRILMOQDA (PUL TUSHISHI KUTILMOQDA)")
+                              : (lang === 'ru' ? "❌ ОТКЛОНЕНО (СРЕДСТВА НЕ ПОСТУПИЛИ)" : "❌ RAD ETILGAN (PUL TUSHMAY QOLGAN)")}
                           </span>
                         </td>
                         <td>{new Date(pay.createdAt).toLocaleDateString()}</td>
@@ -565,29 +572,96 @@ export function StudentDashboardPage() {
         {/* 5. NOTIFICATIONS */}
         {activeTab === 'notifications' && (
           <div className="tab-panel">
-            <div className="panel-head-row">
+            <div className="panel-head-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '18px' }}>
               <h3>🔔 {lang === 'ru' ? 'Уведомления' : 'Bildirishnomalar'} ({myNotifications.length})</h3>
-              <button className="btn btn-outline btn-sm" onClick={markNotificationsRead}>
-                ✓ {t.dashboard.markAllRead}
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {myNotifications.length > 0 && (
+                  <>
+                    <button className="btn btn-outline btn-sm" onClick={markNotificationsRead}>
+                      ✓ {t.dashboard.markAllRead}
+                    </button>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                      onClick={clearAllNotifications}
+                      title={lang === 'ru' ? "Очистить все уведомления" : "Barcha bildirishnomalarni tozalash"}
+                    >
+                      🗑️ {lang === 'ru' ? "Очистить все" : "Barchasini o'chirish"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="notifications-stack">
-              {myNotifications.map((n) => (
-                <div key={n.id} className={`notif-card ${n.read ? '' : 'unread'}`}>
-                  <div>
-                    <p>{loc(n, 'text')}</p>
-                    <small className="text-muted">
-                      {new Date(n.createdAt).toLocaleString()}
-                    </small>
+
+            {myNotifications.length === 0 ? (
+              <div className="table-card" style={{ textAlign: 'center', padding: '48px 20px', borderRadius: '14px', background: 'var(--surface)' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📭</div>
+                <h4 style={{ marginBottom: '6px' }}>
+                  {lang === 'ru' ? "Нет уведомлений" : "Hozircha bildirishnomalar yo'q"}
+                </h4>
+                <p className="text-muted" style={{ fontSize: '0.9rem', margin: 0 }}>
+                  {lang === 'ru'
+                    ? "Все важные оповещения, подтверждения оплаты и сертификаты появятся здесь."
+                    : "Barcha muhim xabarlar, to'lov tasdiqlari va sertifikatlar shu yerda aks etadi."}
+                </p>
+              </div>
+            ) : (
+              <div className="notifications-stack">
+                {myNotifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`notif-card ${n.read ? '' : 'unread'}`}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: '14px',
+                      position: 'relative',
+                      padding: '14px 18px',
+                      borderRadius: '12px',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: n.read ? 500 : 600 }}>
+                        {loc(n, 'text')}
+                      </p>
+                      <small className="text-muted">
+                        {new Date(n.createdAt).toLocaleString()}
+                      </small>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {!n.read && (
+                        <span className="status-pill pending">
+                          {lang === 'ru' ? 'НОВОЕ' : 'YANGI'}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{
+                          color: '#ef4444',
+                          padding: '5px 10px',
+                          borderRadius: '8px',
+                          fontSize: '0.84rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          background: 'rgba(239, 68, 68, 0.06)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => deleteNotification(n.id)}
+                        title={lang === 'ru' ? "Удалить это уведомление" : "Ushbu bildirishnomani o'chirish"}
+                      >
+                        🗑️ {lang === 'ru' ? "Удалить" : "O'chirish"}
+                      </button>
+                    </div>
                   </div>
-                  {!n.read && (
-                    <span className="status-pill pending">
-                      {lang === 'ru' ? 'НОВОЕ' : 'YANGI'}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1051,6 +1125,264 @@ export function LearningPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+export function MyCoursesPage() {
+  const {
+    loc,
+    db,
+    currentUser,
+    navigate,
+    getCourseProgress,
+    setActiveCertificate,
+    lang
+  } = useApp();
+
+  if (!currentUser) {
+    return (
+      <div className="section auth-section">
+        <div className="container narrow-container">
+          <div className="auth-card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '16px' }}>🔒</div>
+            <h2>{lang === 'ru' ? 'Требуется авторизация' : "Tizimga kirish talab qilinadi"}</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
+              {lang === 'ru'
+                ? 'Для просмотра купленных курсов необходимо войти в свой аккаунт.'
+                : "Sotib olingan kurslaringizni ko'rish uchun iltimos, hisobingizga kiring."}
+            </p>
+            <button className="btn btn-primary" onClick={() => navigate('login', { redirect: 'myCourses' })}>
+              🔑 {lang === 'ru' ? 'Войти в аккаунт' : 'Tizimga kirish'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const myEnrollments = (db.enrollments || []).filter((e) => e.userId === currentUser.id);
+  const hasAllAccess = myEnrollments.some((e) => e.courseId === 'all');
+  const myCourses = hasAllAccess
+    ? (db.courses || []).filter((c) => c.status === 'published' || c.status === 'draft')
+    : myEnrollments
+        .map((e) => (db.courses || []).find((c) => c.id === e.courseId))
+        .filter(Boolean);
+
+  const pendingPayments = (db.payments || []).filter(
+    (p) => p.userId === currentUser.id && p.status === 'pending'
+  );
+
+  return (
+    <div className="section mdev-courses-section">
+      <div className="container">
+        {/* Top Header Badge & Starry Ambience */}
+        <div className="mdev-header-badge-wrap">
+          <span className="mdev-ambient-star star-tl">✦</span>
+          <span className="mdev-ambient-star star-tr">★</span>
+          <span className="mdev-ambient-star star-br">✦</span>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+            {lang === 'ru' ? 'Мои купленные курсы' : 'Mening sotib olgan kurslarim'}
+          </h1>
+          <p className="mdev-header-badge" style={{ margin: 0 }}>
+            {lang === 'ru'
+              ? 'Курсы, к которым у вас открыт постоянный доступ и текущий прогресс обучения'
+              : "Siz xarid qilgan, doimiy kirish huquqiga ega bo'lgan kurslaringiz va o'qish jarayoni"}
+          </p>
+        </div>
+
+        {/* Pending Payments Alert */}
+        {pendingPayments.length > 0 && (
+          <div
+            style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1.5px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              marginBottom: '26px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '14px',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '1.8rem' }}>⏳</span>
+              <div>
+                <strong style={{ color: '#f59e0b', fontSize: '1rem', display: 'block' }}>
+                  {lang === 'ru' ? 'Оплата на проверке' : "To'lov cheki tekshirilmoqda"}
+                </strong>
+                <small style={{ color: 'var(--text-muted)' }}>
+                  {lang === 'ru'
+                    ? `У вас ${pendingPayments.length} платеж(ей) на проверке у администратора. Доступ откроется сразу после подтверждения.`
+                    : `Sizda ${pendingPayments.length} ta to'lov cheki admin tekshiruvida. Tasdiqlanishi bilan kursingiz ochiladi.`}
+                </small>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              onClick={() => navigate('dashboard')}
+              style={{ borderColor: 'rgba(245, 158, 11, 0.5)', color: '#f59e0b' }}
+            >
+              {lang === 'ru' ? 'Смотреть статус' : "Statusni ko'rish"}
+            </button>
+          </div>
+        )}
+
+        {/* Courses Display */}
+        {myCourses.length === 0 ? (
+          <div
+            className="mdev-card"
+            style={{
+              textAlign: 'center',
+              padding: '60px 24px',
+              maxWidth: '680px',
+              margin: '0 auto',
+              cursor: 'default'
+            }}
+          >
+            <div
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '20px',
+                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1.5px solid rgba(99, 102, 241, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '2.4rem',
+                margin: '0 auto 20px auto'
+              }}
+            >
+              🎓
+            </div>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '10px' }}>
+              {lang === 'ru' ? 'У вас пока нет купленных курсов' : "Sizda hali sotib olingan kurslar yo'q"}
+            </h3>
+            <p
+              style={{
+                color: 'var(--text-muted)',
+                fontSize: '0.98rem',
+                maxWidth: '460px',
+                margin: '0 auto 28px auto',
+                lineHeight: 1.6
+              }}
+            >
+              {lang === 'ru'
+                ? 'Выберите подходящее направление из каталога курсов, чтобы начать обучение и получить доступ к урокам и практическим заданиям.'
+                : "Kurslar katalogidan o'zingizga ma'qul yo'nalishni tanlang va to'lov qilib, darslar hamda uy vazifalariga ega bo'ling."}
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-lg"
+                onClick={() => navigate('courses')}
+                style={{ padding: '12px 28px', fontSize: '1rem', fontWeight: 600 }}
+              >
+                🚀 {lang === 'ru' ? 'Перейти в каталог курсов' : "Kurslar bo'limiga o'tish"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="enrolled-courses-grid">
+            {myCourses.map((course) => {
+              const progress = getCourseProgress(currentUser.id, course.id);
+              const teacher = (db.users || []).find((u) => u.id === course.teacherId);
+              const category = (db.categories || []).find((c) => c.id === course.categoryId);
+              const cert = (db.certificates || []).find(
+                (c) => c.userId === currentUser.id && c.courseId === course.id
+              );
+              const lessonsCount = (db.modules || [])
+                .filter((m) => m.courseId === course.id)
+                .reduce((acc, m) => acc + (db.lessons || []).filter((l) => l.moduleId === m.id).length, 0);
+
+              return (
+                <div key={course.id} className="enrolled-course-card">
+                  <div style={{ position: 'relative' }}>
+                    <img src={course.thumbnail} alt={loc(course, 'title')} />
+                    {category && (
+                      <span className="course-cat-badge" style={{ position: 'absolute', top: '12px', left: '12px' }}>
+                        {loc(category, 'name')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="enrolled-course-body">
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 10px 0' }}>
+                      {loc(course, 'title')}
+                    </h3>
+
+                    {teacher && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                        <img
+                          src={teacher.avatar}
+                          alt={teacher.name}
+                          style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          {teacher.name}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="progress-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                        {lang === 'ru' ? 'Прогресс изучения:' : "O'zlashtirish:"}
+                      </span>
+                      <strong style={{ color: progress >= 100 ? '#10b981' : '#3b82f6' }}>{progress}%</strong>
+                    </div>
+
+                    <div className="progress-bar-track" style={{ height: '8px', borderRadius: '99px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: '14px' }}>
+                      <div
+                        className="progress-bar-fill"
+                        style={{
+                          width: `${progress}%`,
+                          height: '100%',
+                          background: progress >= 100
+                            ? 'linear-gradient(90deg, #10b981, #059669)'
+                            : 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                          borderRadius: '99px',
+                          transition: 'width 0.4s ease'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      <span>📚 {lessonsCount} {lang === 'ru' ? 'уроков' : 'ta dars'}</span>
+                      {progress >= 100 && (
+                        <span style={{ color: '#10b981', fontWeight: 600 }}>✓ {lang === 'ru' ? 'Завершено' : 'Tugatildi'}</span>
+                      )}
+                    </div>
+
+                    <div className="enrolled-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm btn-block"
+                        onClick={() => navigate('learning', { courseId: course.id })}
+                        style={{ padding: '10px 16px', fontWeight: 600 }}
+                      >
+                        ▶️ {lang === 'ru' ? 'Продолжить обучение' : 'Darslarni davom ettirish'}
+                      </button>
+                      {cert && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm btn-block"
+                          onClick={() => setActiveCertificate(cert)}
+                          style={{ marginTop: '6px' }}
+                        >
+                          🎓 {lang === 'ru' ? 'Сертификат' : 'Sertifikatni yuklab olish'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

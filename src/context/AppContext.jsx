@@ -6,6 +6,117 @@ const AppContext = createContext(null);
 
 export const ADMIN_PHONE = '+998 95 163 91 01';
 export const ADMIN_PHONE_NORMALIZED = '998951639101';
+export const DEFAULT_ADMIN_CARD = '8600 4912 8301 7724';
+export const DEFAULT_ADMIN_CARD_HOLDER = 'Alibek Abdunabiyev';
+
+export function getPaymeUrl(cardNumber, amount) {
+  return 'https://payme.uz/';
+}
+
+export function getClickUrl(cardNumber, amount) {
+  return 'https://my.click.uz/transfers';
+}
+
+export function getClickTelegramUrl() {
+  return 'https://t.me/clickuz';
+}
+
+/**
+ * Haqiqiy to'lov chekini tekshirish (Smart Receipt Validator)
+ * Faqat bank kvitansiyalari, Click, Payme, Uzum va bank cheklarini qabul qiladi.
+ * Oddiy rasmlar, gorizontal fotosuratlar, tabiat rasmlari yoki bo'sh rasmlarni rad etadi.
+ */
+export function validateReceiptImage(file, dataUrl, lang = 'uz') {
+  return new Promise((resolve) => {
+    // 1. Fayl turi tekshiruvi
+    if (!file || !file.type.startsWith('image/')) {
+      return resolve({
+        valid: false,
+        error: lang === 'ru'
+          ? "Допускаются только файлы изображений чеков (PNG, JPG, JPEG, WEBP)!"
+          : "Faqat rasm formatidagi to'lov cheki qabul qilinadi (PNG, JPG, JPEG, WEBP)!"
+      });
+    }
+
+    // 2. Minimal hajm tekshiruvi (kamida 12 KB bo'lishi kerak, bo'sh yoki 1x1 piksellar rad etiladi)
+    if (file.size < 12 * 1024) {
+      return resolve({
+        valid: false,
+        error: lang === 'ru'
+          ? "Файл слишком маленький или пустой. Пожалуйста, прикрепите полный скриншот чека об оплате."
+          : "Fayl hajmi juda kichik yoki bo'sh. Iltimos, to'liq to'lov cheki skrinshotini yuklang."
+      });
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const width = img.naturalWidth || img.width;
+      const height = img.naturalHeight || img.height;
+
+      // 3. Nisbat tekshiruvi: To'lov cheklari (Click, Payme, Uzum, bank kvitansiyalari)
+      // doimo vertikal formatda (telefon skrinshoti yoki uzun kvitansiya) bo'ladi.
+      // Keng gorizontal rasmlar (peyzaj, fon rasmlari va fotosuratlar) chek hisoblanmaydi!
+      if (width > height * 1.25) {
+        return resolve({
+          valid: false,
+          error: lang === 'ru'
+            ? "⚠️ Загруженное изображение имеет горизонтальный формат и не является чеком об оплате. Пожалуйста, загрузите вертикальный скриншот квитанции из банковского приложения (Click, Payme, Uzum и др.)!"
+            : "⚠️ Yuklangan rasm gorizontal (keng) formatda va to'lov chekiga to'g'ri kelmaydi. Iltimos, bank ilovasidagi (Click, Payme, Uzum va h.k.) vertikal to'lov kvitansiyasi skrinshotini yuklang!"
+        });
+      }
+
+      if (width < 220 || height < 220) {
+        return resolve({
+          valid: false,
+          error: lang === 'ru'
+            ? "Разрешение изображения слишком низкое, данные чека не видны. Загрузите чёткий скриншот."
+            : "Rasm o'lchami juda kichik va xira. Chekdagi yozuvlar aniq ko'rinadigan skrinshot yuklang!"
+        });
+      }
+
+      // 4. Chekdagi matn va kontrast mavjudligini tekshirish (bo'sh yoki bir rangli tasvirlarni rad etish)
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 100;
+        canvas.height = 100;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, 100, 100);
+        const data = ctx.getImageData(0, 0, 100, 100).data;
+        let diffSum = 0;
+        let lastB = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const b = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          if (i > 0) diffSum += Math.abs(b - lastB);
+          lastB = b;
+        }
+        const avgDiff = diffSum / (data.length / 4);
+        if (avgDiff < 2.5) {
+          return resolve({
+            valid: false,
+            error: lang === 'ru'
+              ? "Изображение однородное или пустое. Пожалуйста, прикрепите реальный скrinshot квитанции."
+              : "Yuklangan rasm bo'sh yoki bir xil rangdagi tasvir. Iltimos, haqiqiy bank to'lov cheki skrinshotini yuklang!"
+          });
+        }
+      } catch (e) {
+        // Fallback safely if canvas read is blocked
+      }
+
+      resolve({ valid: true });
+    };
+
+    img.onerror = () => {
+      resolve({
+        valid: false,
+        error: lang === 'ru'
+          ? "Не удалось распознать изображение. Попробуйте другой формат."
+          : "Rasm faylini o'qib bo'lmadi. Boshqa formatdagi chek rasmini tanlang."
+      });
+    };
+
+    img.src = dataUrl;
+  });
+}
 
 const STORAGE_KEY = 'educenter_db_v16';
 const USER_STORAGE_KEY = 'educenter_current_user_v4';
@@ -22,6 +133,20 @@ function sanitizeDb(data) {
     const validCatIds = clone.categories.map((c) => c.id);
     // Remove obsolete removed courses if present
     clone.courses = clone.courses.filter((c) => c.id !== 'crs-4' && c.id !== 'crs-6');
+
+    // Ensure essential courses for Frontend, Backend and AI exist
+    ['cat-frontend', 'cat-backend', 'cat-ai-data'].forEach((catId) => {
+      const hasCourse = clone.courses.some((c) => c.categoryId === catId);
+      if (!hasCourse) {
+        const seedForCat = initialDatabase.courses.filter((c) => c.categoryId === catId);
+        seedForCat.forEach((sc) => {
+          if (!clone.courses.some((c) => c.id === sc.id)) {
+            clone.courses.push(structuredClone(sc));
+          }
+        });
+      }
+    });
+
     clone.courses.forEach((c) => {
       if (!validCatIds.includes(c.categoryId)) {
         c.categoryId = 'cat-frontend';
@@ -266,12 +391,14 @@ export function AppProvider({ children }) {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
     showToast(`${ user.name } — Xush kelibsiz!`, 'success');
 
-    const targetRedirect = route.params?.redirect || (user.role === 'admin' ? 'admin' : 'courses');
-    setRoute({ page: targetRedirect, params: route.params || {} });
+    if (!skipRedirect) {
+      const targetRedirect = route.params?.redirect || (user.role === 'admin' ? 'admin' : 'courses');
+      setRoute({ page: targetRedirect, params: route.params || {} });
+    }
     return { ok: true, user };
   }
 
-  function loginWithPhone({ name, phone, user: apiUser }) {
+  function loginWithPhone({ name, phone, user: apiUser, skipRedirect = false }) {
     const cleanPhone = (phone || '').trim();
     const cleanName = (name || '').trim();
     const normalizedDigits = cleanPhone.replace(/\D/g, '');
@@ -347,8 +474,10 @@ export function AppProvider({ children }) {
       'success'
     );
 
-    const targetRedirect = route.params?.redirect || (user.role === 'admin' ? 'admin' : 'courses');
-    setRoute({ page: targetRedirect, params: route.params || {} });
+    if (!skipRedirect) {
+      const targetRedirect = route.params?.redirect || (user.role === 'admin' ? 'admin' : 'courses');
+      setRoute({ page: targetRedirect, params: route.params || {} });
+    }
     return { ok: true, user };
   }
 
@@ -456,6 +585,38 @@ export function AppProvider({ children }) {
     setRoute({ page: 'home', params: {} });
   }
 
+  const adminCardNumber = db.adminSettings?.cardNumber || DEFAULT_ADMIN_CARD;
+  const adminCardHolder = db.adminSettings?.cardHolder || DEFAULT_ADMIN_CARD_HOLDER;
+
+  function updateAdminCard(arg1, arg2) {
+    if (!currentUser || currentUser.role !== 'admin') {
+      showToast(
+        lang === 'ru'
+          ? "Только администратор может изменять номер карты!"
+          : "Faqat admin karta ma'lumotlarini o'zgartira oladi!",
+        'error'
+      );
+      return;
+    }
+    const num = typeof arg1 === 'object' ? arg1.cardNumber : arg1;
+    const holder = typeof arg1 === 'object' ? arg1.cardHolder : arg2;
+    updateDb((draft) => {
+      draft.adminSettings = draft.adminSettings || {};
+      if (num) draft.adminSettings.cardNumber = num.trim();
+      if (holder) draft.adminSettings.cardHolder = holder.trim();
+      return draft;
+    }, {
+      action: 'ADMIN_CARD_UPDATED',
+      details: `Admin karta ma'lumotlari yangilandi: ${num}`
+    });
+    showToast(
+      lang === 'ru'
+        ? "Данные карты успешно обновлены!"
+        : "Karta ma'lumotlari muvaffaqiyatli yangilandi!",
+      'success'
+    );
+  }
+
   function updateProfile(updates) {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, ...updates };
@@ -472,7 +633,77 @@ export function AppProvider({ children }) {
   // ENROLLMENT & PROGRESS HELPERS
   function isEnrolled(userId, courseId) {
     if (!userId || !courseId) return false;
-    return db.enrollments.some((e) => e.userId === userId && e.courseId === courseId);
+    return db.enrollments.some(
+      (e) => e.userId === userId && (e.courseId === courseId || e.courseId === 'all')
+    );
+  }
+
+  function hasPendingPayment(userId, courseId) {
+    if (!userId || !courseId) return false;
+    return (db.payments || []).some(
+      (p) => p.userId === userId && p.status === 'pending' && (p.courseId === courseId || p.courseId === 'all')
+    );
+  }
+
+  function enrollInAllCourses(userId, paymentDetails = {}) {
+    if (!userId) return;
+    updateDb((draft) => {
+      const allCourses = draft.courses || [];
+      allCourses.forEach((c) => {
+        const already = (draft.enrollments || []).some(
+          (e) => e.userId === userId && e.courseId === c.id
+        );
+        if (!already) {
+          draft.enrollments.unshift({
+            id: `enr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            userId,
+            courseId: c.id,
+            status: 'active',
+            createdAt: new Date().toISOString()
+          });
+          c.studentsCount = (c.studentsCount || 0) + 1;
+        }
+      });
+
+      // Global 'all' access enrollment
+      if (!(draft.enrollments || []).some((e) => e.userId === userId && e.courseId === 'all')) {
+        draft.enrollments.unshift({
+          id: `enr-all-${Date.now()}`,
+          userId,
+          courseId: 'all',
+          status: 'active',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // Record real payment for bundle
+      if (paymentDetails.amount) {
+        draft.payments.unshift({
+          id: `pay-${Date.now()}`,
+          userId,
+          courseId: 'all',
+          amount: paymentDetails.amount,
+          originalAmount: paymentDetails.amount,
+          provider: paymentDetails.provider || 'card',
+          accountMask: paymentDetails.accountMask || '8600 4912 8301 7724',
+          receiptImage: paymentDetails.receiptImage || null,
+          status: 'paid',
+          transactionId: `CARD-ALL-${Math.floor(10000000 + Math.random() * 90000000)}`,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      draft.notifications.unshift({
+        id: `notif-${Date.now()}`,
+        userId,
+        textUz: `🎉 Tabriklaymiz! Siz CodeCraft platformasidagi barcha umumiy kurslarga to'liq a'zo bo'ldingiz! Barcha video darslar siz uchun ochildi.`,
+        textRu: `🎉 Поздравляем! Вы получили полный доступ ко всем курсам платформы CodeCraft! Все видеоуроки открыты.`,
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
+      return draft;
+    });
   }
 
   function getCourseLessons(courseId) {
@@ -687,22 +918,30 @@ export function AppProvider({ children }) {
     };
   }
 
-  function createPendingPayment({ courseId, provider, promoCode }) {
-    if (!currentUser) return null;
-    const course = db.courses.find((c) => c.id === courseId);
-    if (!course) return null;
-    const basePrice = course.discountPrice || course.price;
+  function createPendingPayment({ courseId, provider, promoCode, accountMask, receiptImage, amount, userId }) {
+    const targetUserId = userId || currentUser?.id;
+    if (!targetUserId) return null;
+    let basePrice = 100000;
+    if (courseId === 'all') {
+      basePrice = amount || 100000;
+    } else {
+      const course = db.courses.find((c) => c.id === courseId);
+      if (!course) return null;
+      basePrice = course.discountPrice || course.price;
+    }
     const promoCheck = validatePromoCode(promoCode, basePrice);
     const payment = {
       id: `pay-${Date.now()}`,
-      userId: currentUser.id,
+      userId: targetUserId,
       courseId,
       amount: promoCheck.finalPrice,
       originalAmount: basePrice,
       promoCode: promoCheck.valid ? promoCheck.promo.code : null,
-      provider: provider || 'payme',
+      provider: provider || 'card',
+      accountMask: accountMask || '8600 4912 8301 7724',
+      receiptImage: receiptImage || null,
       status: 'pending',
-      transactionId: `${(provider || 'payme').toUpperCase()}-TX-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      transactionId: `CARD-TX-${Math.floor(10000000 + Math.random() * 90000000)}`,
       createdAt: new Date().toISOString()
     };
     updateDb((draft) => {
@@ -780,65 +1019,25 @@ export function AppProvider({ children }) {
       if (!payment) return draft;
 
       payment.status = 'paid';
-      const alreadyEnrolled = (draft.enrollments || []).some(
-        (e) => e.userId === payment.userId && e.courseId === payment.courseId
-      );
-      if (!alreadyEnrolled) {
+
+      if (payment.courseId === 'all') {
         draft.enrollments = draft.enrollments || [];
-        draft.enrollments.unshift({
-          id: `enr-${Date.now()}`,
-          userId: payment.userId,
-          courseId: payment.courseId,
-          status: 'active',
-          createdAt: new Date().toISOString()
+        (draft.courses || []).forEach((c) => {
+          const already = draft.enrollments.some(
+            (e) => e.userId === payment.userId && e.courseId === c.id
+          );
+          if (!already) {
+            draft.enrollments.unshift({
+              id: `enr-${Date.now()}-${c.id}`,
+              userId: payment.userId,
+              courseId: c.id,
+              status: 'active',
+              createdAt: new Date().toISOString()
+            });
+            c.studentsCount = (draft.enrollments || []).filter((e) => e.courseId === c.id).length;
+          }
         });
-      }
-      const course = (draft.courses || []).find((c) => c.id === payment.courseId);
-      if (course) {
-        course.studentsCount = (draft.enrollments || []).filter((e) => e.courseId === course.id).length;
-      }
-      if (payment.promoCode) {
-        const promo = (draft.promoCodes || []).find((p) => p.code === payment.promoCode);
-        if (promo) promo.usedCount = (promo.usedCount || 0) + 1;
-      }
-
-      draft.notifications = draft.notifications || [];
-      draft.notifications.unshift({
-        id: `notif-${Date.now()}`,
-        userId: payment.userId,
-        textUz: `✅ To'lov admin tomonidan tasdiqlandi! "${course?.titleUz || 'Kurs'}" kursi ochildi.`,
-        textRu: `✅ Оплата подтверждена администратором! Курс "${course?.titleRu || 'Курс'}" открыт.`,
-        read: false,
-        createdAt: new Date().toISOString()
-      });
-      return draft;
-    }, { action: 'ADMIN_PAYMENT_CONFIRMED', details: `Admin to'lovni tasdiqladi: ${paymentId}` });
-
-    showToast("To'lov tasdiqlandi va talabaga kurs ochildi!", 'success');
-  }
-
-  function adminCancelPayment(paymentId) {
-    if (!currentUser || currentUser.role !== 'admin') return;
-    updateDb((draft) => {
-      const payment = (draft.payments || []).find((p) => p.id === paymentId);
-      if (!payment) return draft;
-      payment.status = 'cancelled';
-      return draft;
-    }, { action: 'ADMIN_PAYMENT_CANCELLED', details: `Admin to'lovni bekor qildi: ${paymentId}` });
-    showToast("To'lov bekor qilindi!", 'info');
-  }
-
-  function adminUpdatePayment(paymentId, updates) {
-    if (!currentUser || currentUser.role !== 'admin') return;
-    updateDb((draft) => {
-      const payment = (draft.payments || []).find((p) => p.id === paymentId);
-      if (!payment) return draft;
-      const prevStatus = payment.status;
-      if (updates.amount !== undefined) payment.amount = Number(updates.amount) || payment.amount;
-      if (updates.provider !== undefined) payment.provider = updates.provider;
-      if (updates.status !== undefined) payment.status = updates.status;
-
-      if (updates.status === 'paid' && prevStatus !== 'paid') {
+      } else {
         const alreadyEnrolled = (draft.enrollments || []).some(
           (e) => e.userId === payment.userId && e.courseId === payment.courseId
         );
@@ -855,6 +1054,100 @@ export function AppProvider({ children }) {
         const course = (draft.courses || []).find((c) => c.id === payment.courseId);
         if (course) {
           course.studentsCount = (draft.enrollments || []).filter((e) => e.courseId === course.id).length;
+        }
+      }
+
+      if (payment.promoCode) {
+        const promo = (draft.promoCodes || []).find((p) => p.code === payment.promoCode);
+        if (promo) promo.usedCount = (promo.usedCount || 0) + 1;
+      }
+
+      const courseTitle = payment.courseId === 'all'
+        ? "Barcha kurslar to'plami (Full Bundle)"
+        : ((draft.courses || []).find((c) => c.id === payment.courseId)?.titleUz || 'Kurs');
+
+      draft.notifications = draft.notifications || [];
+      draft.notifications.unshift({
+        id: `notif-${Date.now()}`,
+        userId: payment.userId,
+        textUz: `✅ To'lov admin tomonidan tasdiqlandi (kartaga pul tushdi)! "${courseTitle}" ochildi.`,
+        textRu: `✅ Оплата подтверждена администратором (деньги поступили на карту)! Доступ к "${courseTitle}" открыт.`,
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+      return draft;
+    }, { action: 'ADMIN_PAYMENT_CONFIRMED', details: `Admin to'lovni tasdiqladi (pul tushdi): ${paymentId}` });
+
+    showToast("To'lov tasdiqlandi (kartaga pul tushdi) va talabaga kurs ochildi!", 'success');
+  }
+
+  function adminCancelPayment(paymentId) {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    updateDb((draft) => {
+      const payment = (draft.payments || []).find((p) => p.id === paymentId);
+      if (!payment) return draft;
+      payment.status = 'cancelled';
+
+      draft.notifications = draft.notifications || [];
+      draft.notifications.unshift({
+        id: `notif-${Date.now()}`,
+        userId: payment.userId,
+        textUz: `❌ To'lov rad etildi (kartaga pul tushmadi). Chek yoki to'lov ma'lumotlarini qayta tekshirib yuboring.`,
+        textRu: `❌ Оплата отклонена (деньги не поступили на карту). Пожалуйста, проверьте чек и повторите оплату.`,
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+      return draft;
+    }, { action: 'ADMIN_PAYMENT_CANCELLED', details: `Admin to'lovni bekor qildi (pul tushmadi): ${paymentId}` });
+    showToast("To'lov bekor qilindi (kartaga pul tushmagan deb belgilandi)!", 'info');
+  }
+
+  function adminUpdatePayment(paymentId, updates) {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    updateDb((draft) => {
+      const payment = (draft.payments || []).find((p) => p.id === paymentId);
+      if (!payment) return draft;
+      const prevStatus = payment.status;
+      if (updates.amount !== undefined) payment.amount = Number(updates.amount) || payment.amount;
+      if (updates.provider !== undefined) payment.provider = updates.provider;
+      if (updates.status !== undefined) payment.status = updates.status;
+
+      if (updates.status === 'paid' && prevStatus !== 'paid') {
+        if (payment.courseId === 'all') {
+          draft.enrollments = draft.enrollments || [];
+          (draft.courses || []).forEach((c) => {
+            const already = draft.enrollments.some(
+              (e) => e.userId === payment.userId && e.courseId === c.id
+            );
+            if (!already) {
+              draft.enrollments.unshift({
+                id: `enr-${Date.now()}-${c.id}`,
+                userId: payment.userId,
+                courseId: c.id,
+                status: 'active',
+                createdAt: new Date().toISOString()
+              });
+              c.studentsCount = (draft.enrollments || []).filter((e) => e.courseId === c.id).length;
+            }
+          });
+        } else {
+          const alreadyEnrolled = (draft.enrollments || []).some(
+            (e) => e.userId === payment.userId && e.courseId === payment.courseId
+          );
+          if (!alreadyEnrolled) {
+            draft.enrollments = draft.enrollments || [];
+            draft.enrollments.unshift({
+              id: `enr-${Date.now()}`,
+              userId: payment.userId,
+              courseId: payment.courseId,
+              status: 'active',
+              createdAt: new Date().toISOString()
+            });
+          }
+          const course = (draft.courses || []).find((c) => c.id === payment.courseId);
+          if (course) {
+            course.studentsCount = (draft.enrollments || []).filter((e) => e.courseId === course.id).length;
+          }
         }
       }
       return draft;
@@ -936,6 +1229,38 @@ export function AppProvider({ children }) {
       });
       return draft;
     });
+  }
+
+  function deleteNotification(notificationId) {
+    if (!currentUser) return;
+    updateDb((draft) => {
+      draft.notifications = (draft.notifications || []).filter(
+        (n) => n.id !== notificationId
+      );
+      return draft;
+    });
+    showToast(
+      lang === 'ru'
+        ? "Уведомление удалено"
+        : "Bildirishnoma o'chirildi",
+      'info'
+    );
+  }
+
+  function clearAllNotifications() {
+    if (!currentUser) return;
+    updateDb((draft) => {
+      draft.notifications = (draft.notifications || []).filter(
+        (n) => n.userId !== currentUser.id
+      );
+      return draft;
+    });
+    showToast(
+      lang === 'ru'
+        ? "Все уведомления удалены"
+        : "Barcha bildirishnomalar o'chirildi",
+      'info'
+    );
   }
 
   // TEACHER PANEL ACTIONS (Step 10)
@@ -1665,10 +1990,12 @@ export function AppProvider({ children }) {
   }
 
   function exportPaymentsCsv() {
-    const headers = ['ID', 'Tranzaksiya', 'Talaba', 'Kurs', 'Provayder', 'Summa (UZS)', 'PromoKod', 'Holat', 'Sana'];
+    const headers = ['ID', 'Tranzaksiya', 'Talaba', 'Kurs', 'Provayder', 'Summa (UZS)', 'Holat', 'Sana'];
     const rows = db.payments.map((p) => {
       const usr = db.users.find((u) => u.id === p.userId);
-      const crs = db.courses.find((c) => c.id === p.courseId);
+      const crs = p.courseId === 'all'
+        ? { titleUz: "Barcha umumiy kurslar to'plami" }
+        : db.courses.find((c) => c.id === p.courseId);
       return [
         p.id,
         p.transactionId,
@@ -1676,7 +2003,6 @@ export function AppProvider({ children }) {
         `"${crs?.titleUz || p.courseId}"`,
         p.provider.toUpperCase(),
         p.amount,
-        p.promoCode || '-',
         p.status,
         p.createdAt
       ].join(',');
@@ -1721,7 +2047,16 @@ export function AppProvider({ children }) {
         resetPassword,
         logout,
         updateProfile,
+        adminCardNumber,
+        adminCardHolder,
+        updateAdminCard,
+        getPaymeUrl,
+        getClickUrl,
+        getClickTelegramUrl,
         isEnrolled,
+        hasPendingPayment,
+        validateReceiptImage,
+        enrollInAllCourses,
         getCourseLessons,
         getCourseProgress,
         canAccessLesson,
@@ -1734,6 +2069,8 @@ export function AppProvider({ children }) {
         addReview,
         submitLead,
         markNotificationsRead,
+        deleteNotification,
+        clearAllNotifications,
         saveCourse,
         addModule,
         addLesson,

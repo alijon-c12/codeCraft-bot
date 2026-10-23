@@ -8,6 +8,7 @@ export const ru = {
   nav: {
     home: "Главная",
     courses: "Курсы",
+    myCourses: "Мои курсы",
     teachers: "Преподаватели",
     verifyCert: "Проверка сертификата",
     about: "О нас",

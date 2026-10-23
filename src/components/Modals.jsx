@@ -11,9 +11,14 @@ export function GlobalModals() {
     currentUser,
     checkoutCourse,
     setCheckoutCourse,
-    validatePromoCode,
     createPendingPayment,
-    processPaymentWebhook,
+    hasPendingPayment,
+    validateReceiptImage,
+    adminCardNumber,
+    adminCardHolder,
+    getPaymeUrl,
+    getClickUrl,
+    getClickTelegramUrl,
     previewLesson,
     setPreviewLesson,
     activeCertificate,
@@ -23,11 +28,16 @@ export function GlobalModals() {
     lang
   } = useApp();
 
-  const [provider, setProvider] = useState('payme');
-  const [promoInput, setPromoInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState(null);
-  const [pendingPayment, setPendingPayment] = useState(null);
+  const [receiptImage, setReceiptImage] = useState('');
+  const [receiptError, setReceiptError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [modalVideoUrl, setModalVideoUrl] = useState('');
+
+  useEffect(() => {
+    setIsProcessing(false);
+    setReceiptImage('');
+    setReceiptError('');
+  }, [checkoutCourse]);
 
   useEffect(() => {
     let active = true;
@@ -47,55 +57,111 @@ export function GlobalModals() {
 
   if (!checkoutCourse && !previewLesson && !activeCertificate) return null;
 
-  // 1. CHECKOUT & PAYME/CLICK SANDBOX MODAL
+  // 1. CHECKOUT & PAYME/CLICK PAYMENT MODAL
   if (checkoutCourse) {
     const basePrice = checkoutCourse.discountPrice || checkoutCourse.price;
-    const promoResult = validatePromoCode(appliedPromo || '', basePrice);
+    const isAlreadyEnrolled = Boolean(
+      currentUser &&
+      db.enrollments.some(
+        (e) => e.userId === currentUser.id && (e.courseId === checkoutCourse.id || e.courseId === 'all')
+      )
+    );
+    const isPendingApproval = Boolean(
+      currentUser && hasPendingPayment(currentUser.id, checkoutCourse.id)
+    );
 
-    function handleApplyPromo() {
-      const check = validatePromoCode(promoInput, basePrice);
-      if (check.valid) {
-        setAppliedPromo(promoInput.toUpperCase().trim());
-        showToast(t.payment.promoApplied, 'success');
-      } else {
-        setAppliedPromo(null);
-        showToast(t.payment.promoInvalid, 'error');
+    function handleReceiptFileChange(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast(
+          lang === 'ru'
+            ? 'Пожалуйста, выберите файл изображения (PNG, JPG, JPEG, WEBP)!'
+            : "Iltimos, rasm faylini tanlang (PNG, JPG, JPEG, WEBP)!",
+          'error'
+        );
+        return;
       }
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result;
+        // Smart Receipt Validation: Faqat haqiqiy to'lov cheklarini qabul qiladi
+        const checkResult = await validateReceiptImage(file, dataUrl, lang);
+        if (!checkResult.valid) {
+          setReceiptImage('');
+          setReceiptError(checkResult.error);
+          showToast(checkResult.error, 'error');
+          return;
+        }
+        setReceiptImage(dataUrl);
+        setReceiptError('');
+        showToast(
+          lang === 'ru' ? 'Чек успешно проверен и прикреплён!' : "To'lov cheki tekshirildi va muvaffaqiyatli biriktirildi!",
+          'success'
+        );
+      };
+      reader.readAsDataURL(file);
     }
 
-    function handleCreateInvoice() {
+    function handlePayNow() {
       if (!currentUser) {
+        showToast(
+          lang === 'ru'
+            ? 'Пожалуйста, сначала войдите в систему!'
+            : "Kursni sotib olish uchun avval tizimga kiring!",
+          'warning'
+        );
         setCheckoutCourse(null);
         navigate('login');
         return;
       }
-      const payment = createPendingPayment({
-        courseId: checkoutCourse.id,
-        provider,
-        promoCode: appliedPromo
-      });
-      setPendingPayment(payment);
-    }
 
-    function handleWebhookConfirm(status) {
-      if (!pendingPayment) return;
-      processPaymentWebhook(pendingPayment.id, status);
-      const targetCourseId = checkoutCourse.id;
-      setPendingPayment(null);
-      setCheckoutCourse(null);
-      setPromoInput('');
-      setAppliedPromo(null);
-      if (status === 'paid') {
-        navigate('learning', { courseId: targetCourseId });
+      if (!receiptImage) {
+        setReceiptError(
+          lang === 'ru'
+            ? 'Пожалуйста, прикрепите фото чека об оплате! Без чека покупка невозможна.'
+            : "Iltimos, to'lov cheki rasmini yuklang! Cheksiz kursni sotib ololmaysiz."
+        );
+        showToast(
+          lang === 'ru'
+            ? 'Пожалуйста, прикрепите фото чека об оплате!'
+            : "Iltimos, to'lov cheki rasmini yuklang!",
+          'error'
+        );
+        return;
       }
+
+      setIsProcessing(true);
+
+      setTimeout(() => {
+        const accountMask = (adminCardNumber || '8600 4912 8301 7724').trim();
+
+        // 1. Faqat pending to'lov yaratiladi! Kartaga pul tushmagunicha kurs ochilmaydi!
+        createPendingPayment({
+          courseId: checkoutCourse.id,
+          provider: 'card',
+          accountMask,
+          receiptImage
+        });
+
+        setIsProcessing(false);
+        setCheckoutCourse(null);
+
+        showToast(
+          lang === 'ru'
+            ? "Чек отправлен на проверку! Администратор проверит зачисление средств на карту и откроет курс."
+            : "To'lov chekingiz adminga yuborildi! Admin kartaga pul tushganini tekshirib tasdiqlagach kurs ochiladi.",
+          'success'
+        );
+      }, 700);
     }
 
     return (
-      <div className="modal-backdrop" onClick={() => { setCheckoutCourse(null); setPendingPayment(null); }}>
+      <div className="modal-backdrop" onClick={() => { if (!isProcessing) setCheckoutCourse(null); }}>
         <div className="modal-card" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
             <h3>💳 {t.payment.title}</h3>
-            <button className="close-btn" onClick={() => { setCheckoutCourse(null); setPendingPayment(null); }}>✕</button>
+            <button className="close-btn" disabled={isProcessing} onClick={() => setCheckoutCourse(null)}>✕</button>
           </div>
 
           <div className="modal-body">
@@ -107,93 +173,312 @@ export function GlobalModals() {
               </div>
             </div>
 
-            {!pendingPayment ? (
+            <div style={{ background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '10px', padding: '10px 14px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.3rem' }}>🌟</span>
+              <div style={{ fontSize: '0.86rem', lineHeight: '1.4' }}>
+                <strong>{lang === 'ru' ? 'Полный доступ ко всей платформе:' : "Barcha kurslarga to'liq kirish:"}</strong>{' '}
+                {lang === 'ru'
+                  ? 'Вам не нужно покупать каждый урок или видео отдельно. Данная оплата открывает все видеоуроки и курсы!'
+                  : "Videolarni birma-bir sotib olishingiz shart emas. Ushbu to'lov platformadagi barcha umumiy kurslarni ochadi!"}
+              </div>
+            </div>
+
+            {isAlreadyEnrolled ? (
+              <div style={{ textAlign: 'center', padding: '24px 10px' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎓</div>
+                <h4 style={{ marginBottom: '8px' }}>
+                  {lang === 'ru'
+                    ? 'Вы уже приобрели этот курс!'
+                    : "Siz ushbu kursni allaqachon sotib olgansiz!"}
+                </h4>
+                <p className="text-muted" style={{ marginBottom: '20px', fontSize: '0.9rem' }}>
+                  {lang === 'ru'
+                    ? 'Все видеоуроки и практические задания уже доступны в вашем кабинете.'
+                    : "Barcha darslar va topshiriqlar sizning shaxsiy kabinetingizda ochiq."}
+                </p>
+                <button
+                  className="btn btn-primary btn-block btn-lg"
+                  onClick={() => {
+                    const cid = checkoutCourse.id;
+                    setCheckoutCourse(null);
+                    navigate('learning', { courseId: cid });
+                  }}
+                >
+                  ▶ {lang === 'ru' ? 'Перейти к обучению' : "Darslarni boshlash"}
+                </button>
+              </div>
+            ) : isPendingApproval ? (
+              <div style={{ textAlign: 'center', padding: '24px 10px' }}>
+                <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>⏳</div>
+                <h4 style={{ marginBottom: '10px', color: '#f59e0b' }}>
+                  {lang === 'ru'
+                    ? 'Оплата проверяется администратором!'
+                    : "To'lov tekshirilmoqda!"}
+                </h4>
+                <p className="text-muted" style={{ marginBottom: '16px', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                  {lang === 'ru'
+                    ? 'Вы уже отправили чек об оплате. Администратор проверяет поступление средств на банковскую карту. Как только деньги поступят на карту, курс автоматически откроется в вашем кабинете.'
+                    : "Siz to'lov chekini yuborgansiz. Admin bank kartasiga pul tushganini tekshirmoqda. Kartaga pul tushishi bilan kurs kabinetingizda avtomatik ochiladi."}
+                </p>
+                <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', fontSize: '0.85rem', textAlign: 'left' }}>
+                  🛡️ <strong>{lang === 'ru' ? 'Правило безопасности:' : 'Xavfsizlik qoidasi:'}</strong>{' '}
+                  {lang === 'ru'
+                    ? 'Доступ к курсу активируется только после подтверждения реального поступления средств на карту.'
+                    : "Kartaga haqiqiy pul kelib tushmagunicha kurs ochilmaydi."}
+                </div>
+                <button
+                  className="btn btn-outline btn-block"
+                  onClick={() => setCheckoutCourse(null)}
+                >
+                  {lang === 'ru' ? 'Понятно' : 'Tushunarli'}
+                </button>
+              </div>
+            ) : (
               <>
-                <label className="field-label">{t.payment.selectProvider}</label>
-                <div className="provider-grid">
-                  <button
-                    type="button"
-                    className={`provider-card ${provider === 'payme' ? 'selected' : ''}`}
-                    onClick={() => setProvider('payme')}
-                  >
-                    <span className="provider-logo payme-text">Payme</span>
-                    <small>Uzcard / Humo / Visa</small>
-                  </button>
-                  <button
-                    type="button"
-                    className={`provider-card ${provider === 'click' ? 'selected' : ''}`}
-                    onClick={() => setProvider('click')}
-                  >
-                    <span className="provider-logo click-text">CLICK Evolution</span>
-                    <small>{lang === 'ru' ? 'Быстрая оплата' : "Tezkor to'lov"}</small>
-                  </button>
-                </div>
-
-                <label className="field-label">{t.payment.promoLabel}</label>
-                <div className="promo-row">
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder={t.payment.promoPlaceholder}
-                    value={promoInput}
-                    onChange={(e) => setPromoInput(e.target.value)}
-                  />
-                  <button type="button" className="btn btn-outline" onClick={handleApplyPromo}>
-                    {t.payment.applyPromo}
-                  </button>
-                </div>
-                <small className="promo-hint">
-                  💡 {lang === 'ru' ? 'Тестовые промокоды:' : 'Sinov promo-kodlar:'} <code>EDUCENTER20</code> (-20%), <code>START50</code> (-50,000), <code>PRO30</code> (-30%)
-                </small>
-
-                <div className="price-breakdown">
-                  <div className="price-row">
-                    <span>{t.payment.originalPrice}</span>
-                    <span>{formatPrice(basePrice)}</span>
+                {/* 1. ADMIN KARTA RAQAMI VA MA'LUMOTLARI */}
+                <div
+                  className="admin-card-payment-box"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.14))',
+                    border: '2px solid rgba(99, 102, 241, 0.45)',
+                    borderRadius: '16px',
+                    padding: '18px',
+                    marginBottom: '16px',
+                    boxShadow: '0 8px 24px rgba(99, 102, 241, 0.12)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                      💳 {lang === 'ru' ? 'Оплата на банковскую карту' : "Bank kartasiga to'lov"}
+                    </span>
+                    <span
+                      style={{
+                        background: 'rgba(99, 102, 241, 0.2)',
+                        color: 'var(--primary)',
+                        fontWeight: 800,
+                        fontSize: '0.72rem',
+                        padding: '3px 8px',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      UZCARD / HUMO
+                    </span>
                   </div>
-                  {promoResult.valid && (
-                    <div className="price-row discount">
-                      <span>{t.payment.discountAmount} ({promoResult.promo.code})</span>
-                      <span>- {formatPrice(promoResult.discountAmount)}</span>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                      {lang === 'ru' ? 'Номер карты для перевода:' : 'To\'lov uchun karta raqami:'}
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <code
+                        style={{
+                          fontSize: '1.25rem',
+                          letterSpacing: '2px',
+                          fontWeight: 800,
+                          color: 'var(--text)',
+                          background: 'var(--surface)',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--border)',
+                          flex: 1,
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        {adminCardNumber}
+                      </code>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText((adminCardNumber || '').replace(/\s+/g, ''));
+                          showToast(lang === 'ru' ? 'Номер карты скопирован!' : 'Karta raqamidan nusxa olindi!', 'success');
+                        }}
+                        title={lang === 'ru' ? 'Скопировать номер карты' : 'Karta raqamidan nusxa olish'}
+                        style={{ padding: '10px 14px', fontWeight: 700 }}
+                      >
+                        📋 {lang === 'ru' ? 'Копировать' : 'Nusxa olish'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.88rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.76rem' }}>
+                        {lang === 'ru' ? 'Владелец карты:' : 'Karta egasi:'}
+                      </span>
+                      <strong>{adminCardHolder}</strong>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.76rem' }}>
+                        {lang === 'ru' ? 'Сумма к оплате:' : "To'lov summasi:"}
+                      </span>
+                      <strong style={{ color: 'var(--primary)', fontSize: '1.2rem', fontWeight: 800 }}>
+                        {formatPrice(basePrice)}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. TO'LOV CHEKINI YUKLASH (MAJBURIY) */}
+                <div
+                  style={{
+                    background: receiptImage ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-alt)',
+                    border: `2px dashed ${receiptImage ? '#10b981' : receiptError ? '#ef4444' : 'var(--border)'}`,
+                    borderRadius: '14px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ margin: 0, fontWeight: 700, fontSize: '0.92rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📸</span>
+                      <span>{lang === 'ru' ? 'Фото чека об оплате (Обязательно):' : "To'lov cheki rasmi (Majburiy):"}</span>
+                    </label>
+                    {receiptImage && (
+                      <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                        ✓ {lang === 'ru' ? 'Чек прикреплён' : 'Chek yuklandi'}
+                      </span>
+                    )}
+                  </div>
+
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                    {lang === 'ru'
+                      ? 'Оплатите на указанную карту через любое приложение (Click, Payme, Uzum и др.) и обязательно прикрепите фото или скриншот чека об оплате.'
+                      : "Yuqoridagi karta raqamiga istalgan ilova (Click, Payme, Uzum va h.k.) orqali to'lov qiling va to'lov kvitansiyasi (chek) skrinshotini bu yerga yuklang."}
+                  </p>
+
+                  {receiptError && (
+                    <div style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', padding: '8px 12px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600, marginBottom: '10px' }}>
+                      ⚠️ {receiptError}
                     </div>
                   )}
-                  <div className="price-row total">
-                    <span>{t.payment.totalPayable}</span>
-                    <span>{formatPrice(promoResult.finalPrice)}</span>
+
+                  {!receiptImage ? (
+                    <label
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        background: 'var(--surface)',
+                        textAlign: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handleReceiptFileChange}
+                      />
+                      <span style={{ fontSize: '2rem' }}>📁</span>
+                      <strong style={{ fontSize: '0.94rem', color: 'var(--primary)' }}>
+                        {lang === 'ru' ? 'Нажмите, чтобы выбрать фото чека' : "Chek rasmini yuklash uchun bosing"}
+                      </strong>
+                      <small style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        PNG, JPG, JPEG, WEBP (maks. 10MB)
+                      </small>
+                    </label>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: 'var(--surface)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                      <img
+                        src={receiptImage}
+                        alt="Chek rasmi"
+                        style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <strong style={{ display: 'block', fontSize: '0.88rem', color: '#10b981' }}>
+                          ✅ {lang === 'ru' ? 'Чек успешно прикреплён' : "To'lov cheki tayyor"}
+                        </strong>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {lang === 'ru' ? 'Вы можете заменить чек или нажать оплатить' : "Rasmni almashtirish yoki davom etish mumkin"}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={handleReceiptFileChange}
+                          />
+                          🔄 {lang === 'ru' ? 'Заменить' : 'Almashtirish'}
+                        </label>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          style={{ color: '#ef4444' }}
+                          onClick={() => setReceiptImage('')}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* NARX HISOBOYI */}
+                <div className="price-breakdown" style={{ marginBottom: '14px' }}>
+                  <div className="price-row">
+                    <span>{lang === 'ru' ? 'Стоимость курса:' : 'Kurs narxi:'}</span>
+                    <span>{formatPrice(basePrice)}</span>
+                  </div>
+                  <div className="price-row total" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{lang === 'ru' ? 'Итого к оплате:' : "Jami to'lov summasi:"}</span>
+                    <span style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 800 }}>
+                      {formatPrice(basePrice)}
+                    </span>
                   </div>
                 </div>
 
-                <button className="btn btn-primary btn-block btn-lg" onClick={handleCreateInvoice}>
-                  🔒 {t.payment.createInvoice} ({provider.toUpperCase()})
-                </button>
-              </>
-            ) : (
-              <div className="sandbox-gateway">
-                <div className="sandbox-alert">
-                  <strong>🛠️ {provider.toUpperCase()} Merchant Sandbox</strong>
-                  <p>{t.payment.sandboxNotice}</p>
-                  <div className="tx-details">
-                    <div><span>Invoice ID:</span> <code>{pendingPayment.transactionId}</code></div>
-                    <div><span>{lang === 'ru' ? 'Статус:' : 'Holat (Status):'}</span> <span className="status-pill pending">PENDING</span></div>
-                    <div><span>{lang === 'ru' ? 'Сумма:' : 'Summa:'}</span> <strong>{formatPrice(pendingPayment.amount)}</strong></div>
-                  </div>
-                </div>
-
-                <div className="sandbox-actions">
+                {/* 3. TASDIQLASH VA KURSLARNI OCHISH */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <button
+                    type="button"
                     className="btn btn-success btn-block btn-lg"
-                    onClick={() => handleWebhookConfirm('paid')}
+                    style={{
+                      background: !receiptImage
+                        ? 'linear-gradient(135deg, #64748b, #475569)'
+                        : 'linear-gradient(135deg, #10b981, #059669)',
+                      border: 'none',
+                      boxShadow: receiptImage ? '0 6px 18px rgba(16, 185, 129, 0.35)' : 'none',
+                      padding: '14px',
+                      fontSize: '1.02rem',
+                      fontWeight: 700,
+                      cursor: isProcessing ? 'wait' : 'pointer'
+                    }}
+                    disabled={isProcessing}
+                    onClick={handlePayNow}
                   >
-                    ✅ {t.payment.confirmWebhook}
+                    {isProcessing ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <span>⏳</span>
+                        {lang === 'ru' ? 'Отправка чека на проверку...' : "Chek adminga tekshiruvga yuborilmoqda..."}
+                      </span>
+                    ) : (
+                      <span>
+                        {receiptImage ? '📤' : '🔒'}{' '}
+                        {lang === 'ru'
+                          ? 'Отправить чек на проверку администратору'
+                          : "To'lov chekini tekshiruvga yuborish"}
+                      </span>
+                    )}
                   </button>
-                  <button
-                    className="btn btn-outline btn-block"
-                    onClick={() => handleWebhookConfirm('cancelled')}
-                  >
-                    ❌ {t.payment.cancelPayment}
-                  </button>
+
+                  {!receiptImage && (
+                    <small style={{ textAlign: 'center', color: '#ef4444', fontSize: '0.8rem', fontWeight: 600 }}>
+                      {lang === 'ru'
+                        ? '⚠️ Сначала прикрепите фото чека выше'
+                        : "⚠️ Avval yuqoridagi maydonga to'lov cheki rasmini yuklang"}
+                    </small>
+                  )}
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>

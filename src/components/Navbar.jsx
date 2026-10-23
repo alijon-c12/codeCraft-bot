@@ -22,7 +22,8 @@ export function Navbar() {
 
   const navItems = currentUser
     ? [
-        { id: 'courses', label: t.nav.courses }
+        { id: 'courses', label: t.nav.courses },
+        { id: 'myCourses', label: t.nav.myCourses }
       ]
     : [
         { id: 'home', label: t.nav.home },

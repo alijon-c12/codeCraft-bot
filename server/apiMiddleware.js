@@ -111,7 +111,7 @@ function sendJson(res, status, payload) {
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
 
-function loadDotEnv() {
+export function loadDotEnv() {
   try {
     if (!fs.existsSync(ENV_PATH)) return;
     const raw = fs.readFileSync(ENV_PATH, 'utf8');
@@ -125,7 +125,7 @@ function loadDotEnv() {
       if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
       }
-      if (key && val) {
+      if (key && (process.env[key] === undefined || process.env[key] === '')) {
         process.env[key] = val;
       }
     }
@@ -148,7 +148,7 @@ const TG_REPLY_KEYBOARD = {
   persistent_keyboard: true
 };
 
-async function sendTelegramBotMessage(chatId, text, extra = {}) {
+export async function sendTelegramBotMessage(chatId, text, extra = {}) {
   loadDotEnv();
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken || !chatId) return { ok: false };
@@ -280,7 +280,7 @@ async function handleTelegramBotUpdate(update) {
   );
 }
 
-function startTelegramBotPolling() {
+export function startTelegramBotPolling() {
   if (globalThis.__codeCraftTgBotPollingActive) return;
   loadDotEnv();
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -796,7 +796,7 @@ export function createApiMiddleware() {
       const user = db.users.find((u) => u.id === userId);
 
       const isEnrolled = db.enrollments.some(
-        (e) => e.userId === userId && e.courseId === course?.id
+        (e) => e.userId === userId && (e.courseId === course?.id || e.courseId === 'all')
       );
       const isOwnerOrAdmin =
         user?.role === 'admin' || (user?.role === 'teacher' && course?.teacherId === user.id);

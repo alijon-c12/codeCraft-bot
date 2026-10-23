@@ -1,0 +1,42 @@
+# ===================================================================
+# Render.com Blueprint Configuration for CodeCraft Platform & Bot
+# ===================================================================
+# https://render.com/docs/blueprint-spec
+
+services:
+  # 1. Asosiy Web Service (Frontend + Backend API + Telegram Bot)
+  - type: web
+    name: codecraft-platform
+    env: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: ESKIZ_EMAIL
+        sync: false
+      - key: ESKIZ_PASSWORD
+        sync: false
+      - key: ESKIZ_FROM
+        value: "4546"
+      - key: TEXTBEE_API_KEY
+        sync: false
+      - key: TEXTBEE_DEVICE_ID
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false

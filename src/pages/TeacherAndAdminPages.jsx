@@ -414,35 +414,6 @@ export function TeacherPanelPage() {
             </div>
           </div>
         )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {myEnrollments.map((enr) => {
-                    const st = db.users.find((u) => u.id === enr.userId);
-                    const crs = db.courses.find((c) => c.id === enr.courseId);
-                    const prog = getCourseProgress(enr.userId, enr.courseId);
-                    return (
-                      <tr key={enr.id}>
-                        <td><strong>{st?.name}</strong></td>
-                        <td>{st?.email || st?.phone}</td>
-                        <td>{loc(crs, 'title')}</td>
-                        <td>{new Date(enr.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <div className="inline-progress">
-                            <div className="progress-bar-track">
-                              <div className="progress-bar-fill" style={{ width: `${prog}%` }} />
-                            </div>
-                            <strong>{prog}%</strong>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* TAB 4: HOMEWORK SUBMISSIONS GRADING */}
         {activeTab === 'submissions' && (
@@ -580,7 +551,10 @@ export function AdminPanelPage() {
     adminAssignHomework,
     showToast,
     lang,
-    navigate
+    navigate,
+    adminCardNumber,
+    adminCardHolder,
+    updateAdminCard
   } = useApp();
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -589,6 +563,11 @@ export function AdminPanelPage() {
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [payFilter, setPayFilter] = useState('all');
+
+  // Admin Card Settings
+  const [editingAdminCard, setEditingAdminCard] = useState(false);
+  const [newCardInput, setNewCardInput] = useState('');
+  const [newHolderInput, setNewHolderInput] = useState('');
 
   // Admin User states
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -601,7 +580,8 @@ export function AdminPanelPage() {
 
   // Payment editing modal states
   const [editingPayment, setEditingPayment] = useState(null);
-  const [editPayForm, setEditPayForm] = useState({ amount: '', status: 'paid', provider: 'payme' });
+  const [editPayForm, setEditPayForm] = useState({ amount: '', status: 'paid', provider: 'card' });
+  const [viewingReceiptImage, setViewingReceiptImage] = useState(null);
 
   const paidPayments = (db.payments || []).filter((p) => p.status === 'paid');
   const totalRevenue = paidPayments.reduce((s, p) => s + p.amount, 0);
@@ -1400,6 +1380,100 @@ export function AdminPanelPage() {
         {/* 5. PAYMENTS & CSV EXPORT */}
         {activeTab === 'payments' && (
           <div className="tab-panel">
+            {/* ADMIN KARTA SOZLAMALARI (Click va Payme qabul qiluvchi karta) */}
+            <div
+              className="chart-card"
+              style={{
+                padding: '16px 20px',
+                borderRadius: '14px',
+                marginBottom: '20px',
+                border: '1px solid rgba(99, 102, 241, 0.35)',
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.09), rgba(168, 85, 247, 0.09))'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    💳 {lang === 'ru' ? 'Номер карты для приёма оплаты студентов:' : "Talabalardan to'lovlarni qabul qilish bank kartasi:"}
+                  </h4>
+                  <small className="text-muted">
+                    {lang === 'ru'
+                      ? 'Этот номер карты отображается студентам. Только администратор может изменять его. Доступ к курсам открывается только после подтверждения поступления средств на карту.'
+                      : "Ushbu karta talabalarga to'lov uchun ko'rsatiladi. Uni faqat admin o'zgartira oladi. Talaba chek yuborgach, kartaga pul tushganini tekshirib tasdiqlaysiz."}
+                  </small>
+                </div>
+                {!editingAdminCard ? (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => {
+                      setNewCardInput(adminCardNumber || '');
+                      setNewHolderInput(adminCardHolder || '');
+                      setEditingAdminCard(true);
+                    }}
+                  >
+                    ✏️ {lang === 'ru' ? 'Изменить карту' : "Kartani o'zgartirish"}
+                  </button>
+                ) : null}
+              </div>
+
+              {!editingAdminCard ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {lang === 'ru' ? 'Номер карты:' : 'Karta raqami:'}
+                    </span>
+                    <code style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '1.5px', background: 'var(--surface)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontFamily: 'monospace' }}>
+                      {adminCardNumber}
+                    </code>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {lang === 'ru' ? 'Владелец:' : 'Egasi:'}
+                    </span>
+                    <strong style={{ fontSize: '1rem' }}>{adminCardHolder}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <input
+                    type="text"
+                    className="input"
+                    style={{ maxWidth: '240px', fontWeight: 700, letterSpacing: '1px', fontFamily: 'monospace' }}
+                    placeholder="8600 0000 0000 0000"
+                    value={newCardInput}
+                    onChange={(e) => setNewCardInput(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    className="input"
+                    style={{ maxWidth: '220px', fontWeight: 600 }}
+                    placeholder="ALIBEK ABDUNABIYEV"
+                    value={newHolderInput}
+                    onChange={(e) => setNewHolderInput(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-success btn-sm"
+                    onClick={() => {
+                      if (!newCardInput.trim()) {
+                        showToast(lang === 'ru' ? 'Введите номер карты!' : "Karta raqamini kiriting!", 'error');
+                        return;
+                      }
+                      updateAdminCard(newCardInput.trim(), newHolderInput.trim());
+                      setEditingAdminCard(false);
+                      showToast(lang === 'ru' ? 'Номер карты успешно обновлён!' : "Karta raqami muvaffaqiyatli yangilandi!", 'success');
+                    }}
+                  >
+                    💾 {lang === 'ru' ? 'Сохранить' : 'Saqlash'}
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setEditingAdminCard(false)}
+                  >
+                    ✕ {lang === 'ru' ? 'Отмена' : 'Bekor qilish'}
+                  </button>
+                </div>
+              )}
+            </div>
             {/* Top KPI Cards for Payments */}
             <div className="overview-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
               <div className="chart-card" style={{ padding: '16px 20px', borderRadius: '12px' }}>
@@ -1482,7 +1556,8 @@ export function AdminPanelPage() {
                       <th>{lang === 'ru' ? "Дата" : "Sana"}</th>
                       <th>{lang === 'ru' ? "Студент" : "Talaba"}</th>
                       <th>{lang === 'ru' ? "Курс" : "Kurs"}</th>
-                      <th>{lang === 'ru' ? "Провайдер" : "Provayder"}</th>
+                      <th>{lang === 'ru' ? "Способ оплаты" : "To'lov usuli"}</th>
+                      <th>{lang === 'ru' ? "Чек (Фото)" : "To'lov cheki"}</th>
                       <th>{lang === 'ru' ? "Сумма" : "Summa"}</th>
                       <th>{lang === 'ru' ? "Статус" : "Holati"}</th>
                       <th style={{ textAlign: 'right' }}>{lang === 'ru' ? "Действия (Управление)" : "Amallar (Boshqaruv)"}</th>
@@ -1495,13 +1570,13 @@ export function AdminPanelPage() {
                         if (payFilter === 'paid') return p.status === 'paid';
                         if (payFilter === 'pending') return p.status === 'pending';
                         if (payFilter === 'cancelled') return p.status === 'cancelled';
-                        if (payFilter === 'payme') return p.provider === 'payme';
-                        if (payFilter === 'click') return p.provider === 'click';
                         return true;
                       })
                       .map((p) => {
                         const usr = (db.users || []).find((u) => u.id === p.userId);
-                        const crs = (db.courses || []).find((c) => c.id === p.courseId);
+                        const crs = p.courseId === 'all'
+                          ? { titleUz: "Barcha umumiy kurslar to'plami (Full Bundle)", titleRu: "Полный доступ ко всем курсам (Full Bundle)" }
+                          : (db.courses || []).find((c) => c.id === p.courseId);
                         const isPaid = p.status === 'paid';
                         const isPending = p.status === 'pending';
 
@@ -1526,8 +1601,32 @@ export function AdminPanelPage() {
                             <td>{crs ? loc(crs, 'title') : p.courseId}</td>
                             <td>
                               <span className="role-badge" style={{ textTransform: 'uppercase' }}>
-                                {p.provider || 'payme'}
+                                {p.provider === 'card' ? '💳 Bank kartasi' : (p.provider || 'KARTA')}
                               </span>
+                              {p.accountMask && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  <code>{p.accountMask}</code>
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              {p.receiptImage ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  style={{ padding: '3px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                  onClick={() => setViewingReceiptImage(p.receiptImage)}
+                                >
+                                  <img
+                                    src={p.receiptImage}
+                                    alt="Chek"
+                                    style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover' }}
+                                  />
+                                  <span>👁 {lang === 'ru' ? 'Смотреть' : 'Ko\'rish'}</span>
+                                </button>
+                              ) : (
+                                <span className="text-muted" style={{ fontSize: '0.8rem' }}>—</span>
+                              )}
                             </td>
                             <td>
                               <strong style={{ color: isPaid ? '#10b981' : 'inherit' }}>
@@ -1555,31 +1654,45 @@ export function AdminPanelPage() {
                             </td>
                             <td style={{ textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                {/* TASDIQLASH (TO'LOV QILINDI) */}
+                                {/* TASDIQLASH (PUL TUSHDI) */}
                                 {!isPaid && (
                                   <button
                                     type="button"
-                                    className="btn btn-xs btn-primary"
-                                    title={lang === 'ru' ? "Подтвердить оплату и открыть курс студенту" : "To'lov qilindi deb tasdiqlash va talabaga kursni ochish"}
+                                    className="btn btn-xs btn-success"
+                                    title={lang === 'ru' ? "Подтвердить поступление денег на карту и открыть курс" : "Kartaga pul tushganini tasdiqlash va talabaga kursni ochish"}
                                     onClick={() => adminConfirmPayment(p.id)}
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#10b981', color: '#fff', border: 'none' }}
                                   >
                                     <span>✓</span>
-                                    <span>{lang === 'ru' ? "Подтвердить" : "Tasdiqlash"}</span>
+                                    <span>{lang === 'ru' ? "Подтвердить (деньги поступили)" : "Tasdiqlash (Pul tushdi)"}</span>
                                   </button>
                                 )}
 
-                                {/* BEKOR QILISH */}
+                                {/* RAD ETISH (PUL TUSHMAY QOLGAN BO'LSA) */}
+                                {isPending && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-outline"
+                                    title={lang === 'ru' ? "Отклонить платёж (деньги не поступили на карту)" : "To'lovni rad etish (kartaga pul tushmadi)"}
+                                    onClick={() => adminCancelPayment(p.id)}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                                  >
+                                    <span>✕</span>
+                                    <span>{lang === 'ru' ? "Отклонить (денег нет)" : "Rad etish (Pul tushmadi)"}</span>
+                                  </button>
+                                )}
+
+                                {/* BEKOR QILISH (AGAR TO'LANGAN BO'LSA) */}
                                 {isPaid && (
                                   <button
                                     type="button"
                                     className="btn btn-xs btn-outline"
-                                    title={lang === 'ru' ? "Отменить платёж" : "To'lovni bekor qilish"}
+                                    title={lang === 'ru' ? "Аннулировать оплату" : "To'lovni bekor qilish"}
                                     onClick={() => adminCancelPayment(p.id)}
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                   >
                                     <span>✕</span>
-                                    <span>{lang === 'ru' ? "Отменить" : "Bekor qilish"}</span>
+                                    <span>{lang === 'ru' ? "Аннулировать" : "Bekor qilish"}</span>
                                   </button>
                                 )}
 
@@ -1628,7 +1741,39 @@ export function AdminPanelPage() {
           </div>
         )}
 
-        {/* MODAL: TO'LOVNI TAHRIRLASH */}
+        {/* MODAL: TO'LOV CHEKI RASMINI KO'RISH */}
+        {viewingReceiptImage && (
+          <div className="modal-backdrop" onClick={() => setViewingReceiptImage(null)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+              <div className="modal-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📸</span>
+                  <span>{lang === 'ru' ? 'Чек об оплате' : "To'lov cheki"}</span>
+                </h3>
+                <button type="button" className="icon-btn" onClick={() => setViewingReceiptImage(null)}>✕</button>
+              </div>
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <img
+                  src={viewingReceiptImage}
+                  alt="Chek rasmi"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '65vh',
+                    borderRadius: '12px',
+                    objectFit: 'contain',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.2)'
+                  }}
+                />
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setViewingReceiptImage(null)}>
+                    {lang === 'ru' ? 'Закрыть' : 'Yopish'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {editingPayment && (
           <div className="modal-backdrop" onClick={() => setEditingPayment(null)}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>

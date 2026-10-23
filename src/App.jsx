@@ -11,7 +11,7 @@ import {
   StaticContentPage
 } from './pages/PublicPages.jsx';
 import { AuthPage } from './pages/AuthPages.jsx';
-import { StudentDashboardPage, LearningPage } from './pages/StudentAndLearningPages.jsx';
+import { StudentDashboardPage, LearningPage, MyCoursesPage } from './pages/StudentAndLearningPages.jsx';
 import { TeacherPanelPage, AdminPanelPage } from './pages/TeacherAndAdminPages.jsx';
 
 function AppRouter() {
@@ -23,6 +23,8 @@ function AppRouter() {
         return currentUser ? <CoursesCatalogPage /> : <HomePage />;
       case 'courses':
         return currentUser ? <CoursesCatalogPage /> : <AuthPage mode="login" />;
+      case 'myCourses':
+        return currentUser ? <MyCoursesPage /> : <AuthPage mode="login" />;
       case 'courseDetail':
         return currentUser ? <CourseDetailPage /> : <AuthPage mode="login" />;
       case 'teachers':

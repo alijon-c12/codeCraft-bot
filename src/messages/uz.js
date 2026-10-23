@@ -8,6 +8,7 @@ export const uz = {
   nav: {
     home: "Bosh sahifa",
     courses: "Kurslar",
+    myCourses: "Mening kurslarim",
     teachers: "O'qituvchilar",
     verifyCert: "Sertifikat tekshirish",
     about: "Biz haqimizda",

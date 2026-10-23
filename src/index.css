@@ -3120,4 +3120,250 @@ textarea {
   }
 }
 
+/* ==========================================================
+   MDEV STYLE COURSES / RULES CARDS SECTION (3 DIRECTIONS)
+   ========================================================== */
+.mdev-courses-section {
+  padding: 18px 0 48px 0;
+  position: relative;
+}
+
+.mdev-header-badge-wrap {
+  text-align: center;
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.mdev-header-badge {
+  display: inline-block;
+  color: #94a3b8;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+[data-theme='dark'] .mdev-header-badge {
+  color: #94a3b8;
+}
+
+.mdev-ambient-star {
+  position: absolute;
+  color: #3b82f6;
+  pointer-events: none;
+  user-select: none;
+  font-size: 1.25rem;
+  opacity: 0.8;
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+  animation: mdevStarTwinkle 4s ease-in-out infinite;
+}
+
+.star-tl {
+  top: -10px;
+  left: 6%;
+}
+
+.star-tr {
+  top: 10px;
+  right: 12%;
+  color: #60a5fa;
+  font-size: 1.4rem;
+  animation-delay: 1.5s;
+}
+
+.star-br {
+  bottom: -15px;
+  right: 4%;
+  color: #38bdf8;
+  animation-delay: 2.8s;
+}
+
+@keyframes mdevStarTwinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 0.95; transform: scale(1.15); }
+}
+
+.mdev-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-bottom: 32px;
+  align-items: stretch;
+}
+
+.mdev-card {
+  background: #0d1222;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='light'] .mdev-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mdev-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='light'] .mdev-card:hover {
+  border-color: #818cf8;
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.12);
+}
+
+/* Middle/Active Card glowing blue border (Exact match to 2nd image) */
+.mdev-card.active,
+.mdev-card.featured {
+  border: 2px solid #3b82f6 !important;
+  box-shadow: 0 0 32px rgba(59, 130, 246, 0.22), inset 0 0 12px rgba(59, 130, 246, 0.04);
+}
+
+.mdev-card-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.mdev-card:hover .mdev-card-icon-box {
+  transform: scale(1.08);
+}
+
+.mdev-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 14px;
+  letter-spacing: -0.01em;
+}
+
+[data-theme='light'] .mdev-card-title {
+  color: #0f172a;
+}
+
+.mdev-bullet-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex-grow: 1;
+}
+
+.mdev-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.90rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+[data-theme='light'] .mdev-bullet-item {
+  color: #475569;
+}
+
+.mdev-bullet-sparkle {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.mdev-card-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-theme='light'] .mdev-card-footer {
+  border-top-color: #f1f5f9;
+}
+
+.mdev-card-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.mdev-card.active .mdev-card-btn {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+}
+
+.mdev-card.active .mdev-card-btn:hover {
+  background: #2563eb;
+}
+
+.mdev-card:not(.active) .mdev-card-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='light'] .mdev-card:not(.active) .mdev-card-btn {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+.mdev-card:not(.active) .mdev-card-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+[data-theme='light'] .mdev-card:not(.active) .mdev-card-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.catalog-courses-subgrid-wrap {
+  background: rgba(13, 18, 34, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 28px 24px;
+  margin-top: 10px;
+}
+
+[data-theme='light'] .catalog-courses-subgrid-wrap {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+@media (max-width: 980px) {
+  .mdev-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+
 

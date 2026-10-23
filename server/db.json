@@ -2,18 +2,18 @@
   "users": [
     {
       "id": "usr-admin-1",
-      "name": "Alibek Abdunabiyev (Bosh Admin)",
+      "name": "Admin",
+      "email": "",
       "phone": "+998 95 163 91 01",
-      "email": "admin@codecraft.uz",
-      "passwordHash": "admin123",
       "role": "admin",
-      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-      "bioUz": "CodeCraft platformasi bosh administratori va tizim to'liq nazoratchisi.",
-      "bioRu": "Главный администратор платформы CodeCraft и руководитель системы.",
+      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
+      "bioUz": "CodeCraft platformasi bosh administratori va tizim nazoratchisi",
+      "bioRu": "Главный администратор платформы CodeCraft",
       "specialtyUz": "Bosh Boshqaruvchi",
       "specialtyRu": "Главный Администратор",
       "blocked": false,
-      "createdAt": "2026-01-10T09:00:00.000Z"
+      "createdAt": "2026-10-22T15:58:09.770Z",
+      "passwordHash": "sms_verified"
     }
   ],
   "categories": [
@@ -48,44 +48,30 @@
   ],
   "courses": [
     {
-      "id": "crs-1792601767894",
-      "titleUz": "AI va inson",
-      "titleRu": "Ali",
-      "slug": "ai-va-inson",
-      "descriptionUz": "Al",
-      "descriptionRu": "Al",
+      "id": "crs-1792778142182",
+      "titleUz": "Kurs",
+      "titleRu": "Kurs",
+      "slug": "kurs",
+      "descriptionUz": "Kurs",
+      "descriptionRu": "Kurs",
       "price": 100000,
       "discountPrice": null,
-      "thumbnail": "https://avatars.mds.yandex.net/i?id=7964163c9ade57811f4a4e1d755a48cd8cfa8f10-5882635-images-thumbs&n=13",
-      "videoUrl": "blob:http://localhost:5173/bdb7418f-a22e-4df1-aa01-2130420be30d",
-      "videoName": "test_hardware_encoder.mp4",
-      "videoId": "vid-crs-1792601759001",
+      "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
       "level": "beginner",
       "language": "O'zbek / Русский",
       "status": "published",
       "teacherId": "usr-teacher-1",
-      "categoryId": "cat-frontend",
+      "categoryId": "cat-backend",
       "durationHours": 40,
       "studentsCount": 0,
       "rating": 5,
-      "createdAt": "2026-10-21T16:56:07.894Z"
+      "createdAt": "2026-10-23T17:55:42.182Z"
     }
   ],
   "modules": [
-    {
-      "id": "mod-101",
-      "courseId": "crs-1",
-      "titleUz": "1-modul: Zamonaviy JavaScript va React 19 Asoslari",
-      "titleRu": "Модуль 1: Современный JavaScript и Основы React 19",
-      "order": 1
-    },
-    {
-      "id": "mod-102",
-      "courseId": "crs-1",
-      "titleUz": "2-modul: Next.js App Router, Backend API va Ma'lumotlar bazasi",
-      "titleRu": "Модуль 2: Next.js App Router, Backend API и Базы данных",
-      "order": 2
-    },
     {
       "id": "mod-201",
       "courseId": "crs-2",
@@ -99,20 +85,6 @@
       "titleUz": "2-modul: Design System va Mobil Ilova Prototiplash",
       "titleRu": "Модуль 2: Дизайн-системы и прототипирование мобильных приложений",
       "order": 2
-    },
-    {
-      "id": "mod-301",
-      "courseId": "crs-3",
-      "titleUz": "1-modul: Python va Data Tahlil (Pandas & NumPy)",
-      "titleRu": "Модуль 1: Python и анализ данных (Pandas & NumPy)",
-      "order": 1
-    },
-    {
-      "id": "mod-501",
-      "courseId": "crs-5",
-      "titleUz": "1-modul: Yuqori yuklamali Node.js va PostgreSQL Arxitekturasi",
-      "titleRu": "Модуль 1: Высоконагруженная архитектура Node.js и PostgreSQL",
-      "order": 1
     },
     {
       "id": "mod-1792600850419",
@@ -134,53 +106,37 @@
       "titleUz": "1-modul: Darslar va Amaliyot",
       "titleRu": "Модуль 1: Уроки и практика",
       "order": 1
+    },
+    {
+      "id": "mod-1792682096707",
+      "courseId": "crs-1792682096706",
+      "titleUz": "1-modul: Darslar va Amaliyot",
+      "titleRu": "Модуль 1: Уроки и практика",
+      "order": 1
+    },
+    {
+      "id": "mod-1792682223121",
+      "courseId": "crs-1792682223106",
+      "titleUz": "1-modul: Darslar va Amaliyot",
+      "titleRu": "Модуль 1: Уроки и практика",
+      "order": 1
+    },
+    {
+      "id": "mod-1792775668875",
+      "courseId": "crs-1792775668875",
+      "titleUz": "1-modul: Darslar va Amaliyot",
+      "titleRu": "Модуль 1: Уроки и практика",
+      "order": 1
+    },
+    {
+      "id": "mod-1792778142182",
+      "courseId": "crs-1792778142182",
+      "titleUz": "1-modul: Darslar va Amaliyot",
+      "titleRu": "Модуль 1: Уроки и практика",
+      "order": 1
     }
   ],
   "lessons": [
-    {
-      "id": "les-1001",
-      "moduleId": "mod-101",
-      "titleUz": "1.1. Kursga kirish, VS Code sozlash va loyiha arxitekturasi",
-      "titleRu": "1.1. Введение в курс, настройка VS Code и архитектура проекта",
-      "type": "video",
-      "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      "contentUz": "Ushbu birinchi darsda biz Full-Stack dasturchi yo'l xaritasi, zamonaviy React ekotizimi va ish muhitini professional darajada sozlashni ko'rib chiqamiz.\n\nAsosiy tushunchalar:\n• Virtual DOM va deklarativ UI\n• Component-based arxitektura\n• Vite va Next.js farqlari",
-      "contentRu": "В этом первом уроке мы разберём дорожную карту Full-Stack разработчика, современную экосистему React и профессиональную настройку рабочего окружения.\n\nКлючевые концепции:\n• Virtual DOM и декларативный UI\n• Компонентная архитектура\n• Отличия Vite и Next.js",
-      "duration": 18,
-      "order": 1,
-      "isFree": true,
-      "attachmentName": "React_Roadmap_va_Konspekt.pdf",
-      "attachmentUrl": "#download-roadmap"
-    },
-    {
-      "id": "les-1002",
-      "moduleId": "mod-101",
-      "titleUz": "1.2. React Hooks: useState, useEffect va Custom Hooklar",
-      "titleRu": "1.2. React Hooks: useState, useEffect и кастомные хуки",
-      "type": "video",
-      "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-      "contentUz": "Komponent holatini (state) boshqarish, side-effectlar bilan ishlash hamda qayta ishlatiluvchi custom hooklar (`useFetch`, `useLocalStorage`) yozish amaliyoti.",
-      "contentRu": "Управление состоянием компонента (state), работа с побочными эффектами и написание переиспользуемых кастомных хуков (`useFetch`, `useLocalStorage`).",
-      "duration": 28,
-      "order": 2,
-      "isFree": true,
-      "attachmentName": "React_Hooks_CheatSheet.pdf",
-      "attachmentUrl": "#download-hooks"
-    },
-    {
-      "id": "les-1003",
-      "moduleId": "mod-102",
-      "titleUz": "2.1. REST API, Autentifikatsiya (JWT) va Prisma ORM bilan ishlash",
-      "titleRu": "2.1. REST API, Аутентификация (JWT) и работа с Prisma ORM",
-      "type": "text",
-      "contentUz": "Server tomonida foydalanuvchilarni ro'yxatdan o'tkazish, parollarni xeshlash, rolga asoslangan middleware himoyasi va PostgreSQL jadvallarini bog'lash.",
-      "contentRu": "Серверная регистрация пользователей, хэширование паролей, ролевая защита через middleware и проектирование связей в PostgreSQL.",
-      "duration": 35,
-      "order": 1,
-      "isFree": false,
-      "attachmentName": "Prisma_Schema_Starter.zip",
-      "attachmentUrl": "#download-prisma"
-    },
     {
       "id": "les-2001",
       "moduleId": "mod-201",
@@ -209,36 +165,6 @@
       "isFree": false,
       "attachmentName": "EduCenter_UI_Kit.fig",
       "attachmentUrl": "#download-uikit"
-    },
-    {
-      "id": "les-3001",
-      "moduleId": "mod-301",
-      "titleUz": "1.1. Python asoslari va AI ekotizimiga kirish",
-      "titleRu": "1.1. Основы Python и введение в экосистему ИИ",
-      "type": "video",
-      "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-      "contentUz": "Python sintaksisi, ma'lumot turlari, funksiyalar va Jupyter Notebook muhitida ma'lumotlarni tahlil qilishni boshlaymiz.",
-      "contentRu": "Синтаксис Python, структуры данных, функции и начало работы с анализом данных в Jupyter Notebook.",
-      "duration": 26,
-      "order": 1,
-      "isFree": true,
-      "attachmentName": "Python_AI_Notebook.pdf",
-      "attachmentUrl": "#download-python"
-    },
-    {
-      "id": "les-5001",
-      "moduleId": "mod-501",
-      "titleUz": "1.1. Microservices arxitekturasi va Docker konteynerlar",
-      "titleRu": "1.1. Микросервисная архитектура и Docker-контейнеры",
-      "type": "video",
-      "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-      "contentUz": "Monolit va mikroservis arxitekturalarini solishtirish, Dockerfile va docker-compose.yml yozish amaliyoti.",
-      "contentRu": "Сравнение монолитной и микросервисной архитектуры, практика написания Dockerfile и docker-compose.yml.",
-      "duration": 32,
-      "order": 1,
-      "isFree": true,
-      "attachmentName": "Docker_Compose_Examples.zip",
-      "attachmentUrl": "#download-docker"
     },
     {
       "id": "les-1792600850419",
@@ -285,6 +211,74 @@
       "videoId": "vid-crs-1792601759001",
       "contentUz": "Al",
       "contentRu": "Al",
+      "duration": 20,
+      "order": 1,
+      "isFree": true,
+      "attachmentName": "Kurs_Dasturi.pdf",
+      "attachmentUrl": "#download"
+    },
+    {
+      "id": "les-1792682096707",
+      "moduleId": "mod-1792682096707",
+      "titleUz": "1.1. Kurs bilan tanishuv",
+      "titleRu": "1.1. Знакомство с курсом",
+      "type": "text",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
+      "contentUz": "AI va inson ortasiidag farq",
+      "contentRu": "AI va inson ortasiidag farq",
+      "duration": 20,
+      "order": 1,
+      "isFree": true,
+      "attachmentName": "Kurs_Dasturi.pdf",
+      "attachmentUrl": "#download"
+    },
+    {
+      "id": "les-1792682223121",
+      "moduleId": "mod-1792682223121",
+      "titleUz": "1.1. Kurs bilan tanishuv",
+      "titleRu": "1.1. Знакомство с курсом",
+      "type": "text",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
+      "contentUz": "UI",
+      "contentRu": "UI",
+      "duration": 20,
+      "order": 1,
+      "isFree": true,
+      "attachmentName": "Kurs_Dasturi.pdf",
+      "attachmentUrl": "#download"
+    },
+    {
+      "id": "les-1792775668875",
+      "moduleId": "mod-1792775668875",
+      "titleUz": "1.1. Kurs bilan tanishuv",
+      "titleRu": "1.1. Знакомство с курсом",
+      "type": "text",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
+      "contentUz": "Antigravity bu agent bolib koplab AI modellarini oz ichiga joylab qoygan\n",
+      "contentRu": "Antigravity bu agent bolib koplab AI modellarini oz ichiga joylab qoygan\n",
+      "duration": 20,
+      "order": 1,
+      "isFree": true,
+      "attachmentName": "Kurs_Dasturi.pdf",
+      "attachmentUrl": "#download"
+    },
+    {
+      "id": "les-1792778142182",
+      "moduleId": "mod-1792778142182",
+      "titleUz": "1.1. Kurs bilan tanishuv",
+      "titleRu": "1.1. Знакомство с курсом",
+      "type": "text",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
+      "contentUz": "Kurs",
+      "contentRu": "Kurs",
       "duration": 20,
       "order": 1,
       "isFree": true,
@@ -458,6 +452,34 @@
   ],
   "enrollments": [
     {
+      "id": "enr-all-1792692529222",
+      "userId": "usr-admin-1",
+      "courseId": "all",
+      "status": "active",
+      "createdAt": "2026-10-22T18:08:49.222Z"
+    },
+    {
+      "id": "enr-1792692529222-d0zv",
+      "userId": "usr-admin-1",
+      "courseId": "crs-1792682096706",
+      "status": "active",
+      "createdAt": "2026-10-22T18:08:49.222Z"
+    },
+    {
+      "id": "enr-1792692529199",
+      "userId": "usr-admin-1",
+      "courseId": "crs-1792682223106",
+      "status": "active",
+      "createdAt": "2026-10-22T18:08:49.199Z"
+    },
+    {
+      "id": "enr-1792681981176",
+      "userId": "usr-admin-1",
+      "courseId": "crs-1792601767894",
+      "status": "completed",
+      "createdAt": "2026-10-22T15:13:01.176Z"
+    },
+    {
       "id": "enr-1792600920797",
       "userId": "usr-admin-1",
       "courseId": "crs-1792600850392",
@@ -472,6 +494,13 @@
       "lessonId": "les-1792600850419",
       "completed": true,
       "updatedAt": "2026-10-21T16:42:08.902Z"
+    },
+    {
+      "id": "lp-1792682000290",
+      "userId": "usr-admin-1",
+      "lessonId": "les-1792601767894",
+      "completed": true,
+      "updatedAt": "2026-10-22T15:13:20.290Z"
     }
   ],
   "submissions": [],
@@ -546,6 +575,13 @@
   ],
   "certificates": [
     {
+      "id": "cert-1792682000290",
+      "userId": "usr-admin-1",
+      "courseId": "crs-1792601767894",
+      "code": "EC-2026-E4BFF0",
+      "issuedAt": "2026-10-22T15:13:20.290Z"
+    },
+    {
       "id": "cert-1792600928902",
       "userId": "usr-admin-1",
       "courseId": "crs-1792600850392",
@@ -553,24 +589,7 @@
       "issuedAt": "2026-10-21T16:42:08.902Z"
     }
   ],
-  "notifications": [
-    {
-      "id": "notif-1792600928902",
-      "userId": "usr-admin-1",
-      "textUz": "🎉 Tabriklaymiz! Siz \"video\" kursini 100% tugatdingiz! Sertifikat kodi: EC-2026-SK8MZQ",
-      "textRu": "🎉 Поздравляем! Вы завершили курс \"video\" на 100%! Код сертификата: EC-2026-SK8MZQ",
-      "read": false,
-      "createdAt": "2026-10-21T16:42:08.902Z"
-    },
-    {
-      "id": "notif-1792600920797",
-      "userId": "usr-admin-1",
-      "textUz": "✅ To'lov muvaffaqiyatli! \"video\" kursi shaxsiy kabinetingizda ochildi. Chek: CLICK-TX-95975545",
-      "textRu": "✅ Оплата прошла успешно! Курс \"video\" открыт в вашем личном кабинете. Чек: CLICK-TX-95975545",
-      "read": false,
-      "createdAt": "2026-10-21T16:42:00.797Z"
-    }
-  ],
+  "notifications": [],
   "leads": [
     {
       "id": "lead-1",
@@ -664,6 +683,150 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1792778142182",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_CREATED",
+      "details": "Kurs saqlandi: Kurs",
+      "createdAt": "2026-10-23T17:55:42.182Z"
+    },
+    {
+      "id": "aud-1792778034471",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-3) o'chirildi",
+      "createdAt": "2026-10-23T17:53:54.471Z"
+    },
+    {
+      "id": "aud-1792778033757",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-5) o'chirildi",
+      "createdAt": "2026-10-23T17:53:53.757Z"
+    },
+    {
+      "id": "aud-1792778032034",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1) o'chirildi",
+      "createdAt": "2026-10-23T17:53:52.034Z"
+    },
+    {
+      "id": "aud-1792777641274",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "USER_DELETED",
+      "details": "Foydalanuvchi (usr-1792684271357) butunlay o'chirildi",
+      "createdAt": "2026-10-23T17:47:21.274Z"
+    },
+    {
+      "id": "aud-1792777639514",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "USER_DELETED",
+      "details": "Foydalanuvchi (usr-1792776964488) butunlay o'chirildi",
+      "createdAt": "2026-10-23T17:47:19.514Z"
+    },
+    {
+      "id": "aud-1792777625673",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "ADMIN_PAYMENT_DELETED",
+      "details": "To'lov o'chirildi: pay-1792681981135",
+      "createdAt": "2026-10-23T17:47:05.673Z"
+    },
+    {
+      "id": "aud-1792777623343",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "ADMIN_PAYMENT_DELETED",
+      "details": "To'lov o'chirildi: pay-1792680869022",
+      "createdAt": "2026-10-23T17:47:03.343Z"
+    },
+    {
+      "id": "aud-1792777609811",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "ADMIN_PAYMENT_DELETED",
+      "details": "To'lov o'chirildi: pay-1792692529222",
+      "createdAt": "2026-10-23T17:46:49.811Z"
+    },
+    {
+      "id": "aud-1792777606748",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "ADMIN_PAYMENT_DELETED",
+      "details": "To'lov o'chirildi: pay-1792692529140",
+      "createdAt": "2026-10-23T17:46:46.748Z"
+    },
+    {
+      "id": "aud-1792777588549",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792775668875) o'chirildi",
+      "createdAt": "2026-10-23T17:46:28.550Z"
+    },
+    {
+      "id": "aud-1792775668875",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_CREATED",
+      "details": "Kurs saqlandi: Antigravity dan foydalanish",
+      "createdAt": "2026-10-23T17:14:28.875Z"
+    },
+    {
+      "id": "aud-1792775589153",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792682096706) o'chirildi",
+      "createdAt": "2026-10-23T17:13:09.153Z"
+    },
+    {
+      "id": "aud-1792775588303",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792682223106) o'chirildi",
+      "createdAt": "2026-10-23T17:13:08.303Z"
+    },
+    {
+      "id": "aud-1792682301702",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "BROADCAST_SENT",
+      "details": "Barcha talabalarga xabar yuborildi: Hurmatli ustozlar bugun kamisya bor",
+      "createdAt": "2026-10-22T15:18:21.702Z"
+    },
+    {
+      "id": "aud-1792682223121",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_CREATED",
+      "details": "Kurs saqlandi: UI",
+      "createdAt": "2026-10-22T15:17:03.121Z"
+    },
+    {
+      "id": "aud-1792682096707",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_CREATED",
+      "details": "Kurs saqlandi: AI",
+      "createdAt": "2026-10-22T15:14:56.707Z"
+    },
+    {
+      "id": "aud-1792682014008",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792601767894) o'chirildi",
+      "createdAt": "2026-10-22T15:13:34.008Z"
+    },
     {
       "id": "aud-1792604121736",
       "userId": "usr-admin-1",
@@ -802,6 +965,57 @@
     }
   ],
   "notificationLogs": [
+    {
+      "id": "nlog-1792776964488",
+      "channel": "SMS_GATEWAY",
+      "recipient": "+998 50 117 81 92",
+      "message": "Xush kelibsiz! CodeCraft platformasiga muvaffaqiyatli kirdingiz (ALi).",
+      "createdAt": "2026-10-23T17:36:04.488Z"
+    },
+    {
+      "id": "sms-1792776953097",
+      "channel": "SMS_GATEWAY",
+      "recipient": "+998 50 117 81 92",
+      "message": "CodeCraft platformasiga kirish uchun tasdiqlash kodi: 9778. Kodni hech kimga bermang!",
+      "status": "sent",
+      "createdAt": "2026-10-23T17:35:53.097Z"
+    },
+    {
+      "id": "nlog-1792692529199",
+      "channel": "TELEGRAM_BOT",
+      "recipient": "Admin Chat (-1001234567890)",
+      "message": "💰 Yangi to'lov (CARD): 1500000 so'm | Tranzaksiya: CARD-TX-82687249",
+      "createdAt": "2026-10-22T18:08:49.199Z"
+    },
+    {
+      "id": "nlog-1792684271357",
+      "channel": "SMS_GATEWAY",
+      "recipient": "+998 50 117 81 92",
+      "message": "Xush kelibsiz! CodeCraft platformasiga muvaffaqiyatli kirdingiz (Clent).",
+      "createdAt": "2026-10-22T15:51:11.357Z"
+    },
+    {
+      "id": "sms-1792684201216",
+      "channel": "SMS_GATEWAY",
+      "recipient": "+998 50 117 81 92",
+      "message": "CodeCraft platformasiga kirish uchun tasdiqlash kodi: 9730. Kodni hech kimga bermang!",
+      "status": "sent",
+      "createdAt": "2026-10-22T15:50:01.217Z"
+    },
+    {
+      "id": "nlog-1792682000290",
+      "channel": "EMAIL_SMTP",
+      "recipient": "+998 95 163 91 01",
+      "message": "🎓 Yangi PDF Sertifikat yaratildi: EC-2026-E4BFF0 (AI va inson)",
+      "createdAt": "2026-10-22T15:13:20.290Z"
+    },
+    {
+      "id": "nlog-1792681981176",
+      "channel": "TELEGRAM_BOT",
+      "recipient": "Admin Chat (-1001234567890)",
+      "message": "💰 Yangi to'lov (CLICK): 100000 so'm | Tranzaksiya: CLICK-TX-84888681",
+      "createdAt": "2026-10-22T15:13:01.176Z"
+    },
     {
       "id": "nlog-1792600928902",
       "channel": "EMAIL_SMTP",

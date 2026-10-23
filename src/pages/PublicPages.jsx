@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
+import { initialDatabase } from '../data/seedData.js';
 
 export function CourseCard({ course }) {
-  const { t, loc, formatPrice, db, navigate, setCheckoutCourse, currentUser, isEnrolled, showToast, lang } = useApp();
+  const { t, loc, formatPrice, db, navigate, setCheckoutCourse, currentUser, isEnrolled, hasPendingPayment, showToast, lang } = useApp();
   const teacher = db.users.find((u) => u.id === course.teacherId);
   const category = db.categories.find((c) => c.id === course.categoryId);
   const enrolled = currentUser && isEnrolled(currentUser.id, course.id);
+  const pending = currentUser && hasPendingPayment(currentUser.id, course.id);
 
   const lessonsCount = db.modules
     .filter((m) => m.courseId === course.id)
@@ -70,6 +72,15 @@ export function CourseCard({ course }) {
                 onClick={() => navigate('learning', { courseId: course.id })}
               >
                 ▶️ {t.courseDetail.continueLearning}
+              </button>
+            ) : pending ? (
+              <button
+                className="btn btn-sm btn-warning"
+                style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 600 }}
+                onClick={() => setCheckoutCourse(course)}
+                title={lang === 'ru' ? 'Чек на проверке у администратора' : "To'lov cheki admin tekshiruvida"}
+              >
+                ⏳ {lang === 'ru' ? 'Проверяется' : 'Tekshirilmoqda'}
               </button>
             ) : (
               <>
@@ -366,7 +377,7 @@ export function HomePage() {
 export function CoursesCatalogPage() {
   const { t, route, currentUser, navigate, lang, db, loc } = useApp();
   const [search, setSearch] = useState(route.params?.search || '');
-  const [selectedCat, setSelectedCat] = useState(route.params?.categoryId || 'all');
+  const [selectedCat, setSelectedCat] = useState(route.params?.categoryId || 'cat-backend');
 
   if (!currentUser) {
     return (
@@ -391,90 +402,323 @@ export function CoursesCatalogPage() {
     );
   }
 
-  const publishedCourses = (db.courses || []).filter((c) => c.status === 'published');
+  const directionTracks = [
+    {
+      id: 'cat-frontend',
+      title: lang === 'ru' ? 'Frontend' : 'Frontend',
+      fullTitle: lang === 'ru' ? 'Frontend разработка' : 'Frontend Dasturlash',
+      badgeColor: '#38bdf8',
+      badgeBg: 'rgba(56, 189, 248, 0.12)',
+      badgeBorder: 'rgba(56, 189, 248, 0.3)',
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      ),
+      bullets: lang === 'ru' ? [
+        'HTML5, CSS3, Flexbox и Адаптивный веб-дизайн',
+        'JavaScript (ES6+), DOM и Асинхронное программирование',
+        'React.js, Next.js и Tailwind CSS экосистема',
+        'Управление состоянием: Redux Toolkit и Context API',
+        'Проекты: Лендинги, Веб-приложения и Дашборды',
+        'Длительность: 4-6 месяцев (С выдачей сертификата)'
+      ] : [
+        'HTML5, CSS3, Flexbox va Responsive Dizayn',
+        'JavaScript (ES6+), DOM va Zamonaviy Web dasturlash',
+        'React.js, Next.js va Tailwind CSS kutubxonalari',
+        'Redux Toolkit, Context API va State boshqaruvi',
+        'Loyihalar: Landing page, Web ilovalar va Dashboard',
+        'Kurs davomiyligi: 4-6 oy (Sertifikat bilan)'
+      ]
+    },
+    {
+      id: 'cat-backend',
+      title: lang === 'ru' ? 'Backend' : 'Backend',
+      fullTitle: lang === 'ru' ? 'Backend разработка' : 'Backend Dasturlash',
+      badgeColor: '#34d399',
+      badgeBg: 'rgba(52, 211, 153, 0.12)',
+      badgeBorder: 'rgba(52, 211, 153, 0.3)',
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+          <line x1="6" y1="6" x2="6.01" y2="6" />
+          <line x1="6" y1="18" x2="6.01" y2="18" />
+        </svg>
+      ),
+      bullets: lang === 'ru' ? [
+        'Node.js, Express.js и Python (Django / FastAPI)',
+        'Базы данных: PostgreSQL, MongoDB, Redis, Prisma ORM',
+        'Архитектура RESTful API, GraphQL и Микросервисы',
+        'JWT аутентификация, Веб-безопасность и защита данных',
+        'Docker контейнеризация, Linux серверы и CI/CD',
+        'Разработка реальных Production-систем'
+      ] : [
+        'Node.js, Express.js va Python (Django / FastAPI)',
+        "Ma'lumotlar bazasi: PostgreSQL, MongoDB, Redis",
+        'RESTful API, GraphQL va Microservices arxitekturasi',
+        'JWT autentifikatsiya, Web xavfsizlik va Kiberhimoya',
+        'Docker, Linux serverlar va CI/CD deploy qilish',
+        'Haqiqiy ishlab chiqarish (Production) tizimlari'
+      ]
+    },
+    {
+      id: 'cat-ai-data',
+      title: lang === 'ru' ? 'Искусственный Интеллект и Data' : "Sun'iy Intellekt va Data",
+      fullTitle: lang === 'ru' ? 'Искусственный Интеллект и Data' : "Sun'iy Intellekt va Data",
+      badgeColor: '#fbbf24',
+      badgeBg: 'rgba(251, 191, 36, 0.12)',
+      badgeBorder: 'rgba(251, 191, 36, 0.3)',
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      ),
+      bullets: lang === 'ru' ? [
+        'Язык Python, Алгоритмы и Прикладная математика',
+        'Data Science: Анализ данных с Pandas и NumPy',
+        'Машинное обучение (Machine Learning с Scikit-Learn)',
+        'Глубокое обучение: Нейросети (PyTorch, TensorFlow)',
+        'Интеграция LLM (ChatGPT, Gemini API) и AI-агенты',
+        'Создание практических ИИ-стартапов и портфолио'
+      ] : [
+        'Python dasturlash, Algoritmlar va Matematika',
+        "Data Science: Pandas, NumPy va Ma'lumotlar tahlili",
+        "Machine Learning (Scikit-Learn) modellarini o'qitish",
+        'Deep Learning: Neyron tarmoqlari (PyTorch, TensorFlow)',
+        'Katta til modellari (LLM), Prompt Engineering va AI Agentlar',
+        'Amaliy AI loyihalar va portfolio yaratish'
+      ]
+    }
+  ];
+
+  const allAvailableCourses = (db.courses && db.courses.length > 0) ? db.courses : initialDatabase.courses;
+  
+  // Guarantee each track has at least its seed courses if none present in db
+  const trackIds = ['cat-frontend', 'cat-backend', 'cat-ai-data'];
+  const enrichedCourses = [...allAvailableCourses];
+  trackIds.forEach((tId) => {
+    const hasAny = enrichedCourses.some((c) => c.categoryId === tId);
+    if (!hasAny) {
+      const seedMatches = initialDatabase.courses.filter((c) => c.categoryId === tId);
+      seedMatches.forEach((sm) => {
+        if (!enrichedCourses.some((ec) => ec.id === sm.id)) {
+          enrichedCourses.push(sm);
+        }
+      });
+    }
+  });
+
+  const publishedCourses = enrichedCourses.filter((c) => c.status === 'published' || !c.status);
+
+  function courseMatchesCategory(c, categoryId) {
+    if (categoryId === 'all') return true;
+    if (c.categoryId === categoryId) return true;
+
+    const hay = `${c.categoryId || ''} ${c.category || ''} ${c.titleUz || ''} ${c.titleRu || ''} ${c.slug || ''}`.toLowerCase();
+    if (categoryId === 'cat-frontend') {
+      return hay.includes('front') || hay.includes('react') || hay.includes('javascript') || hay.includes('html') || hay.includes('web');
+    }
+    if (categoryId === 'cat-backend') {
+      return hay.includes('back') || hay.includes('node') || hay.includes('python') || hay.includes('express') || hay.includes('server') || hay.includes('devops');
+    }
+    if (categoryId === 'cat-ai-data') {
+      return hay.includes('ai') || hay.includes('sun') || hay.includes('data') || hay.includes('intel') || hay.includes('anti') || hay.includes('machine') || hay.includes('deep');
+    }
+    return false;
+  }
+
   const filteredCourses = publishedCourses.filter((c) => {
-    const matchesCat = selectedCat === 'all' || c.categoryId === selectedCat;
+    const matchesCat = courseMatchesCategory(c, selectedCat);
     const q = search.toLowerCase().trim();
     const matchesSearch = !q || loc(c, 'title').toLowerCase().includes(q) || loc(c, 'description').toLowerCase().includes(q);
     return matchesCat && matchesSearch;
   });
 
+  const selectedTrack = directionTracks.find((t) => t.id === selectedCat);
+  const selectedCatTitle = selectedTrack ? selectedTrack.fullTitle : (db.categories.find((c) => c.id === selectedCat)?.nameUz || '');
+
+  function handleSelectTrack(trackId) {
+    setSelectedCat(trackId);
+    setTimeout(() => {
+      const el = document.getElementById('courses-result-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 60);
+  }
+
   return (
-    <div className="section">
+    <div className="section mdev-courses-section">
       <div className="container">
-        <div className="catalog-header">
-          <h1>{t.catalog.title}</h1>
-          <p>{t.catalog.subtitle}</p>
+        {/* Top Header Badge & Starry Ambience */}
+        <div className="mdev-header-badge-wrap">
+          <span className="mdev-ambient-star star-tl">✦</span>
+          <span className="mdev-ambient-star star-tr">★</span>
+          <span className="mdev-ambient-star star-br">✦</span>
+          <p className="mdev-header-badge">
+            {lang === 'ru'
+              ? 'Направления обучения и программы на платформе CodeCraft Academy'
+              : "CodeCraft Academy platformasida o'qish yo'nalishlari va dasturlar"}
+          </p>
         </div>
 
-        <div className="catalog-filters-card" style={{ marginBottom: '24px' }}>
-          <div className="filter-search-wrap" style={{ position: 'relative', marginBottom: '14px' }}>
-            <input
-              type="text"
-              className="input"
-              placeholder={t.catalog.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingRight: '46px' }}
-            />
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                right: '16px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-                pointerEvents: 'none'
-              }}
-            >
-              <circle cx="11" cy="11" r="7" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </div>
-
-          <div className="catalog-categories-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className={`btn btn-sm ${selectedCat === 'all' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setSelectedCat('all')}
-            >
-              {lang === 'ru' ? 'Все направления' : "Barcha yo'nalishlar"}
-            </button>
-            {db.categories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                className={`btn btn-sm ${selectedCat === cat.id ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setSelectedCat(cat.id)}
+        {/* 3 Main Direction Cards Grid */}
+        <div className="mdev-cards-grid">
+          {directionTracks.map((track) => {
+            const isActive = selectedCat === track.id;
+            return (
+              <div
+                key={track.id}
+                className={`mdev-card ${isActive ? 'active' : ''}`}
+                onClick={() => handleSelectTrack(track.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleSelectTrack(track.id);
+                  }
+                }}
               >
-                {loc(cat, 'name')}
-              </button>
-            ))}
-          </div>
+                <div
+                  className="mdev-card-icon-box"
+                  style={{
+                    backgroundColor: track.badgeBg,
+                    border: `1.5px solid ${track.badgeBorder}`
+                  }}
+                >
+                  {track.icon}
+                </div>
+
+                <h3 className="mdev-card-title">{track.title}</h3>
+
+                <ul className="mdev-bullet-list">
+                  {track.bullets.map((bullet, idx) => (
+                    <li key={idx} className="mdev-bullet-item">
+                      <span className="mdev-bullet-sparkle" style={{ color: track.badgeColor }}>✦</span>
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mdev-card-footer">
+                  <button
+                    type="button"
+                    className="mdev-card-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectTrack(track.id);
+                    }}
+                  >
+                    {isActive
+                      ? (lang === 'ru' ? '✓ Выбрано (Курсы ниже ↓)' : "✓ Tanlangan (Kurslar pastda ↓)")
+                      : (lang === 'ru' ? 'Смотреть курсы ↓' : "Kurslarni ko'rish ↓")}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {filteredCourses.length === 0 ? (
-          <div className="empty-box" style={{ padding: '48px 24px', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🔍</div>
-            <h3>{lang === 'ru' ? 'Курсы не найдены' : 'Bunday kurslar topilmadi'}</h3>
-            <p className="text-muted">{lang === 'ru' ? 'Попробуйте изменить поисковый запрос или категорию' : "Qidiruv so'zini yoki kategoriyani o'zgartirib ko'ring"}</p>
+        {/* Courses List Underneath Selected Direction */}
+        <div id="courses-result-section" className="catalog-courses-subgrid-wrap" style={{ scrollMarginTop: '80px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', flexWrap: 'wrap', gap: '14px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: selectedTrack?.badgeColor || '#3b82f6',
+                    boxShadow: `0 0 12px ${selectedTrack?.badgeColor || '#3b82f6'}`
+                  }}
+                />
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0 }}>
+                  {selectedCat === 'all'
+                    ? (lang === 'ru' ? 'Все направления и курсы' : "Barcha yo'nalishlar va kurslar")
+                    : (lang === 'ru' ? `Курсы по направлению: ${selectedCatTitle}` : `${selectedCatTitle} yo'nalishidagi kurslar`)}
+                </h3>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: 0 }}>
+                {filteredCourses.length} {lang === 'ru' ? 'доступных курсов' : "ta mavjud kurs"}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {selectedCat !== 'all' && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setSelectedCat('all')}
+                  style={{ fontSize: '0.84rem' }}
+                >
+                  {lang === 'ru' ? 'Показать все направления' : "Barcha yo'nalishlarni ko'rish"}
+                </button>
+              )}
+
+              <div className="filter-search-wrap" style={{ position: 'relative', minWidth: '220px' }}>
+                <input
+                  type="text"
+                  className="input input-sm"
+                  placeholder={t.catalog.searchPlaceholder}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ paddingRight: '36px', height: '38px', fontSize: '0.86rem' }}
+                />
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="courses-grid">
-            {filteredCourses.map((c) => (
-              <CourseCard key={c.id} course={c} />
-            ))}
-          </div>
-        )}
+
+          {filteredCourses.length === 0 ? (
+            <div className="empty-box" style={{ padding: '40px 20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>🔍</div>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '1.15rem' }}>{lang === 'ru' ? 'Курсы не найдены' : 'Bunday kurslar topilmadi'}</h4>
+              <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '16px' }}>
+                {lang === 'ru' ? 'Попробуйте сбросить фильтр или изменить запрос' : "Qidiruv so'zini yoki kategoriyani o'zgartirib ko'ring"}
+              </p>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => { setSelectedCat('all'); setSearch(''); }}
+              >
+                {lang === 'ru' ? 'Сбросить фильтры' : "Barcha kurslarni ko'rsatish"}
+              </button>
+            </div>
+          ) : (
+            <div className="courses-grid">
+              {filteredCourses.map((c) => (
+                <CourseCard key={c.id} course={c} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -492,6 +736,7 @@ export function CourseDetailPage() {
     navigate,
     currentUser,
     isEnrolled,
+    hasPendingPayment,
     setCheckoutCourse,
     setPreviewLesson,
     addReview,
@@ -533,6 +778,7 @@ export function CourseDetailPage() {
     .sort((a, b) => a.order - b.order);
   const reviews = db.reviews.filter((r) => r.courseId === course.id && r.status === 'approved');
   const enrolled = currentUser && isEnrolled(currentUser.id, course.id);
+  const pending = currentUser && hasPendingPayment(currentUser.id, course.id);
 
   function handleReviewSubmit(e) {
     e.preventDefault();
@@ -727,6 +973,14 @@ export function CourseDetailPage() {
                   onClick={() => navigate('learning', { courseId: course.id })}
                 >
                   ▶️ {t.courseDetail.continueLearning}
+                </button>
+              ) : pending ? (
+                <button
+                  className="btn btn-warning btn-block btn-lg"
+                  style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 700 }}
+                  onClick={() => setCheckoutCourse(course)}
+                >
+                  ⏳ {lang === 'ru' ? 'Оплата проверяется' : "To'lov tekshirilmoqda"}
                 </button>
               ) : (
                 <button
@@ -1437,7 +1691,7 @@ export function StaticContentPage({ slug }) {
                 type="tel"
                 className={`input ${phoneError ? 'input-error' : ''}`}
                 style={phoneError ? { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.04)' } : {}}
-                placeholder="+998 95 163 91 01"
+                placeholder="+998 90 123 45 67"
                 value={contactForm.phone}
                 onChange={(e) => {
                   let val = e.target.value;
