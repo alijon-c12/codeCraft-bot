@@ -585,6 +585,7 @@ export function AdminPanelPage() {
   const [viewingReceiptImage, setViewingReceiptImage] = useState(null);
 
   const paidPayments = (db.payments || []).filter((p) => p.status === 'paid');
+  const pendingPayments = (db.payments || []).filter((p) => p.status === 'pending');
   const totalRevenue = paidPayments.reduce((s, p) => s + p.amount, 0);
 
   return (
@@ -615,17 +616,344 @@ export function AdminPanelPage() {
           </div>
         </div>
 
-        <div className="tabs-bar">
-          {Object.entries(t.adminPanel.tabs).map(([key, label]) => (
+        {/* YANGI KURS SOTIB OLISH SO'ROVI KELGANDA ADMINGA TEZKOR XABARNOMA */}
+        {pendingPayments.length > 0 && activeTab !== 'purchaseRequests' && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(16, 185, 129, 0.14))',
+              border: '2px solid rgba(245, 158, 11, 0.55)',
+              borderRadius: '14px',
+              padding: '16px 20px',
+              marginBottom: '18px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '14px',
+              boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '2rem' }}>🔔</span>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#fbbf24' }}>
+                  {lang === 'ru'
+                    ? `Новые чеки об оплате (${pendingPayments.length} шт.) ожидают вашего подтверждения!`
+                    : `Yangi xabar: ${pendingPayments.length} ta o'quvchi kurs sotib olib, to'lov chekini yubordi!`}
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                  {lang === 'ru'
+                    ? 'Проверьте поступление средств на карту и подтвердите, чтобы открыть курс студенту.'
+                    : "Kartangizga pul tushganini tekshirib tasdiqlang — tasdiqlashingiz bilan o'quvchiga kurs avtomatik ochiladi."}
+                </p>
+              </div>
+            </div>
             <button
-              key={key}
-              className={`tab-btn ${activeTab === key ? 'active' : ''}`}
-              onClick={() => setActiveTab(key)}
+              type="button"
+              className="btn btn-primary"
+              style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#0f172a', fontWeight: 800 }}
+              onClick={() => setActiveTab('purchaseRequests')}
             >
-              {label}
+              🛒 {lang === 'ru' ? 'Перейти к проверке чеков' : "Cheklarni ko'rish va tasdiqlash"} ({pendingPayments.length})
             </button>
-          ))}
+          </div>
+        )}
+
+        <div className="tabs-bar">
+          {Object.entries(t.adminPanel.tabs).map(([key, label]) => {
+            const isPurchaseTab = key === 'purchaseRequests';
+            return (
+              <button
+                key={key}
+                className={`tab-btn ${activeTab === key ? 'active' : ''}`}
+                onClick={() => setActiveTab(key)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                {isPurchaseTab && <span>🛒</span>}
+                <span>{label}</span>
+                {isPurchaseTab && pendingPayments.length > 0 && (
+                  <span
+                    style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      boxShadow: '0 0 10px rgba(239, 68, 68, 0.6)'
+                    }}
+                  >
+                    {pendingPayments.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
+
+        {/* KURS SOTIB OLMOQCHI BO'LGANLAR (CHEK YUBORGAN O'QUVCHILARNI TASDIQLASH BO'LIMI) */}
+        {activeTab === 'purchaseRequests' && (
+          <div className="tab-panel">
+            <div
+              className="chart-card"
+              style={{
+                padding: '18px 22px',
+                borderRadius: '14px',
+                marginBottom: '20px',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(99, 102, 241, 0.08))',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '14px'
+              }}
+            >
+              <div>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 800 }}>
+                  🛒 {lang === 'ru' ? 'Студенты, отправившие чек на покупку курса' : "Kurs sotib olib, to'lov chekini tashlagan o'quvchilar"}
+                </h3>
+                <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>
+                  {lang === 'ru'
+                    ? 'Когда студент отправляет чек об оплате, он появляется здесь. После вашего подтверждения курс мгновенно открывается у студента!'
+                    : "O'quvchi kurs sotib olib chek tashlaganda shu yerga kelib tushadi. Kartangizga pul tushganini tasdiqlasangiz, o'quvchiga kurs shu zahoti avtomatik ochiladi!"}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', padding: '8px 14px', borderRadius: '10px', fontWeight: 700, color: '#fbbf24', fontSize: '0.88rem' }}>
+                  ⏳ {lang === 'ru' ? 'Ожидают подтверждения:' : 'Tasdiqlash kutilmoqda:'} {pendingPayments.length} {lang === 'ru' ? 'чел.' : 'ta'}
+                </div>
+                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', padding: '8px 14px', borderRadius: '10px', fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>
+                  ✅ {lang === 'ru' ? 'Подтверждено (Курс открыт):' : 'Tasdiqlangan (Kurs ochilgan):'} {paidPayments.length} {lang === 'ru' ? 'чел.' : 'ta'}
+                </div>
+              </div>
+            </div>
+
+            {(db.payments || []).length === 0 ? (
+              <div className="table-card" style={{ textAlign: 'center', padding: '56px 24px', borderRadius: '16px' }}>
+                <div style={{ fontSize: '3.4rem', marginBottom: '12px' }}>📭</div>
+                <h3 style={{ marginBottom: '8px' }}>
+                  {lang === 'ru' ? 'Пока никто не отправил запрос на покупку курса' : "Hozircha hech kim kurs sotib olish uchun chek yubormagan"}
+                </h3>
+                <p className="text-muted" style={{ maxWidth: '500px', margin: '0 auto', fontSize: '0.94rem' }}>
+                  {lang === 'ru'
+                    ? 'Как только студент выберет курс и загрузит скриншот чека об оплате, его заявка сразу появится на этой странице.'
+                    : "O'quvchi kursni tanlab, to'lov cheki skrinshotini yuborishi bilan uning so'rovi va cheki shu yerda paydo bo'ladi."}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {(db.payments || []).map((p) => {
+                  const usr = (db.users || []).find((u) => u.id === p.userId);
+                  const crs =
+                    p.courseId === 'all'
+                      ? {
+                          titleUz: "Barcha umumiy kurslar to'plami (Full Bundle)",
+                          titleRu: "Полный доступ ко всем курсам (Full Bundle)"
+                        }
+                      : (db.courses || []).find((c) => c.id === p.courseId);
+                  const studentName = usr?.name || p.userName || (lang === 'ru' ? 'Студент' : "O'quvchi");
+                  const studentPhone = usr?.phone || p.userPhone || "Raqam ko'rsatilmagan";
+                  const courseTitle = (crs ? loc(crs, 'title') : '') || p.courseTitle || (db.courses[0] ? loc(db.courses[0], 'title') : 'Kurs');
+                  const courseThumb = crs?.thumbnail || p.courseThumbnail || db.courses[0]?.thumbnail || '';
+                  const isPaid = p.status === 'paid';
+                  const isPending = p.status === 'pending';
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="chart-card"
+                      style={{
+                        padding: '20px',
+                        borderRadius: '16px',
+                        border: isPending
+                          ? '2px solid rgba(245, 158, 11, 0.65)'
+                          : isPaid
+                          ? '1.5px solid rgba(16, 185, 129, 0.45)'
+                          : '1px solid rgba(239, 68, 68, 0.35)',
+                        background: isPending
+                          ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(15, 23, 42, 0.9))'
+                          : 'var(--surface)',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                        gap: '20px',
+                        alignItems: 'center',
+                        boxShadow: isPending ? '0 10px 28px rgba(245, 158, 11, 0.12)' : 'none'
+                      }}
+                    >
+                      {/* 1. O'QUVCHI VA KURS MA'LUMOTLARI */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        {courseThumb ? (
+                          <img
+                            src={courseThumb}
+                            alt={courseTitle}
+                            style={{ width: '72px', height: '72px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--border)' }}
+                          />
+                        ) : (
+                          <div style={{ width: '72px', height: '72px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', flexShrink: 0 }}>
+                            📚
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                            👤 {lang === 'ru' ? 'Студент:' : "O'quvchi:"}
+                          </div>
+                          <div style={{ fontSize: '1.08rem', fontWeight: 800 }}>{studentName}</div>
+                          <div style={{ fontSize: '0.86rem', color: '#38bdf8', fontWeight: 600, marginBottom: '6px' }}>
+                            📞 {studentPhone}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>
+                            📖 {lang === 'ru' ? 'Курс:' : 'Kurs:'} <span style={{ color: '#a855f7' }}>{courseTitle}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. SUMMA, KARTA VA SANASI */}
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                          💰 {lang === 'ru' ? 'Сумма оплаты:' : "To'lov summasi:"}
+                        </div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#10b981', marginBottom: '6px' }}>
+                          {formatPrice(p.amount)}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          💳 {lang === 'ru' ? 'На карту:' : 'Karta:'} <code>{p.accountMask || adminCardNumber}</code>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                          🕒 {p.createdAt ? new Date(p.createdAt).toLocaleString() : '-'} • <code>{p.transactionId}</code>
+                        </div>
+                      </div>
+
+                      {/* 3. TO'LOV CHEKI SKRINSHOTI */}
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                          📸 {lang === 'ru' ? 'Прикреплённый чек об оплате:' : "Yuborilgan to'lov cheki:"}
+                        </div>
+                        {p.receiptImage ? (
+                          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <img
+                              src={p.receiptImage}
+                              alt="To'lov cheki"
+                              onClick={() => setViewingReceiptImage(p.receiptImage)}
+                              style={{
+                                width: '110px',
+                                height: '90px',
+                                objectFit: 'cover',
+                                borderRadius: '10px',
+                                border: '2px solid rgba(56, 189, 248, 0.5)',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
+                              }}
+                              title={lang === 'ru' ? 'Нажмите, чтобы увеличить чек' : "Chekni kattalashtirib ko'rish uchun bosing"}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-outline"
+                              onClick={() => setViewingReceiptImage(p.receiptImage)}
+                              style={{ fontSize: '0.78rem' }}
+                            >
+                              🔍 {lang === 'ru' ? 'Увеличить чек' : "Chekni to'liq ko'rish"}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-muted" style={{ fontSize: '0.85rem' }}>
+                            {lang === 'ru' ? 'Чек не прикреплён' : 'Chek rasmi biriktirilmagan'}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 4. HOLATI VA TASDIQLASH TUGMALARI */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end', justifyContent: 'center' }}>
+                        <span
+                          style={{
+                            fontSize: '0.8rem',
+                            padding: '5px 12px',
+                            borderRadius: '999px',
+                            fontWeight: 800,
+                            backgroundColor: isPaid
+                              ? 'rgba(16, 185, 129, 0.18)'
+                              : isPending
+                              ? 'rgba(245, 158, 11, 0.2)'
+                              : 'rgba(239, 68, 68, 0.18)',
+                            color: isPaid ? '#10b981' : isPending ? '#fbbf24' : '#ef4444'
+                          }}
+                        >
+                          {isPaid
+                            ? (lang === 'ru' ? '✅ ОПЛАТА ПОДТВЕРЖДЕНА (КУРС ОТКРЫТ)' : "✅ PUL TUSHGANI TASDIQLANDI (KURS OCHIQ)")
+                            : isPending
+                            ? (lang === 'ru' ? '⏳ ОЖИДАЕТ ВАШЕГО ПОДТВЕРЖДЕНИЯ' : "⏳ TASDIQLASHINGIZ KUTILMOQDA")
+                            : (lang === 'ru' ? '❌ ОТКЛОНЕНО (ДЕНЕГ НЕТ)' : "❌ RAD ETILGAN (PUL TUSHMADI)")}
+                        </span>
+
+                        {!isPaid && (
+                          <button
+                            type="button"
+                            className="btn btn-success"
+                            onClick={() => adminConfirmPayment(p.id)}
+                            style={{
+                              background: 'linear-gradient(135deg, #10b981, #059669)',
+                              color: '#fff',
+                              border: 'none',
+                              fontWeight: 800,
+                              padding: '10px 18px',
+                              borderRadius: '10px',
+                              boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
+                              width: '100%',
+                              maxWidth: '280px'
+                            }}
+                          >
+                            ✅ {lang === 'ru' ? 'Подтвердить (Деньги поступили — Открыть курс)' : "Tasdiqlash (Kartaga pul tushdi — Kursni ochish)"}
+                          </button>
+                        )}
+
+                        {isPending && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={() => adminCancelPayment(p.id)}
+                            style={{
+                              color: '#ef4444',
+                              borderColor: 'rgba(239, 68, 68, 0.45)',
+                              width: '100%',
+                              maxWidth: '280px'
+                            }}
+                          >
+                            ✕ {lang === 'ru' ? 'Отклонить (Деньги не поступили)' : "Rad etish (Kartaga pul tushmadi)"}
+                          </button>
+                        )}
+
+                        {isPaid && (
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-outline"
+                              onClick={() => adminCancelPayment(p.id)}
+                              style={{ color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+                            >
+                              ↩️ {lang === 'ru' ? 'Отменить доступ' : 'Tasdiqni bekor qilish'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              style={{ color: '#ef4444' }}
+                              onClick={() => {
+                                if (window.confirm(lang === 'ru' ? 'Удалить эту заявку?' : "Ushbu to'lov so'rovini o'chirmoqchimisiz?")) {
+                                  adminDeletePayment(p.id);
+                                }
+                              }}
+                            >
+                              🗑️ {lang === 'ru' ? 'Удалить' : "O'chirish"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 1. OVERVIEW & CHARTS */}
         {activeTab === 'overview' && (

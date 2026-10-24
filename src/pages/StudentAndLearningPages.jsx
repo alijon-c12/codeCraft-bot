@@ -782,13 +782,19 @@ export function LearningPage() {
   useEffect(() => {
     let active = true;
     async function loadVideo() {
-      if (activeLesson?.videoUrl) {
-        setCurrentVideoUrl(activeLesson.videoUrl);
-      } else if (activeLesson?.videoId) {
-        const u = await getVideoUrl(activeLesson.videoId);
-        if (active && u) setCurrentVideoUrl(u);
-      } else if (course?.videoUrl) {
-        setCurrentVideoUrl(course.videoUrl);
+      const vidId = activeLesson?.videoId || course?.videoId;
+      const rawUrl = activeLesson?.videoUrl || course?.videoUrl || '';
+      if (vidId) {
+        const u = await getVideoUrl(vidId);
+        if (active && u) {
+          setCurrentVideoUrl(u);
+          return;
+        }
+      }
+      if (rawUrl && !rawUrl.startsWith('blob:')) {
+        setCurrentVideoUrl(rawUrl);
+      } else if (rawUrl) {
+        setCurrentVideoUrl(rawUrl);
       } else {
         setCurrentVideoUrl('');
       }

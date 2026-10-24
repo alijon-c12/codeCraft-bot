@@ -63,73 +63,27 @@
   ],
   "courses": [
     {
-      "id": "crs-1792831509378",
-      "titleUz": "cvbcdas",
-      "titleRu": "cvbc vvfdc",
-      "slug": "cvbcdas",
-      "descriptionUz": "aadsvd dcsx",
-      "descriptionRu": "aadsvd dcsx",
+      "id": "crs-1792832319347",
+      "titleUz": "AI video",
+      "titleRu": "Ai videoq",
+      "slug": "ai-video",
+      "descriptionUz": "Bu gogle flowdagi Ai video",
+      "descriptionRu": "Bu gogle flowdagi Ai video",
       "price": 1500000,
       "discountPrice": null,
       "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
+      "videoUrl": "blob:http://localhost:5173/9e8b6479-003a-4844-b9fb-0c3505c8acc7",
+      "videoName": "310148_medium.mp4",
+      "videoId": "vid-crs-1792832274613",
       "level": "beginner",
       "language": "O'zbek / Русский",
       "status": "published",
       "teacherId": "usr-teacher-1",
-      "categoryId": "cat-backend",
+      "categoryId": "cat-frontend",
       "durationHours": 40,
       "studentsCount": 0,
       "rating": 5,
-      "createdAt": "2026-10-24T08:45:09.379Z"
-    },
-    {
-      "id": "crs-1792831448670",
-      "titleUz": "Sotib ol",
-      "titleRu": "Sotib Ol",
-      "slug": "sotib-ol",
-      "descriptionUz": "ncwfckjn",
-      "descriptionRu": "ncwfckjn",
-      "price": 1500000,
-      "discountPrice": null,
-      "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "level": "beginner",
-      "language": "O'zbek / Русский",
-      "status": "published",
-      "teacherId": "usr-teacher-1",
-      "categoryId": "cat-ai-data",
-      "durationHours": 40,
-      "studentsCount": 0,
-      "rating": 5,
-      "createdAt": "2026-10-24T08:44:08.671Z"
-    },
-    {
-      "id": "crs-1792830893833",
-      "titleUz": "AI",
-      "titleRu": "AI",
-      "slug": "ai",
-      "descriptionUz": "Ai",
-      "descriptionRu": "Ai",
-      "price": 100000,
-      "discountPrice": null,
-      "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "level": "advanced",
-      "language": "O'zbek / Русский",
-      "status": "published",
-      "teacherId": "usr-teacher-1",
-      "categoryId": "cat-ai-data",
-      "durationHours": 40,
-      "studentsCount": 0,
-      "rating": 5,
-      "createdAt": "2026-10-24T08:34:53.834Z"
+      "createdAt": "2026-10-24T08:58:39.347Z"
     }
   ],
   "modules": [
@@ -197,22 +151,8 @@
       "order": 1
     },
     {
-      "id": "mod-1792830893835",
-      "courseId": "crs-1792830893833",
-      "titleUz": "1-modul: Darslar va Amaliyot",
-      "titleRu": "Модуль 1: Уроки и практика",
-      "order": 1
-    },
-    {
-      "id": "mod-1792831448694",
-      "courseId": "crs-1792831448670",
-      "titleUz": "1-modul: Darslar va Amaliyot",
-      "titleRu": "Модуль 1: Уроки и практика",
-      "order": 1
-    },
-    {
-      "id": "mod-1792831509379",
-      "courseId": "crs-1792831509378",
+      "id": "mod-1792832319347",
+      "courseId": "crs-1792832319347",
       "titleUz": "1-modul: Darslar va Amaliyot",
       "titleRu": "Модуль 1: Уроки и практика",
       "order": 1
@@ -368,50 +308,16 @@
       "attachmentUrl": "#download"
     },
     {
-      "id": "les-1792830893835",
-      "moduleId": "mod-1792830893835",
-      "titleUz": "1.1. Kurs bilan tanishuv",
-      "titleRu": "1.1. Знакомство с курсом",
-      "type": "text",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "contentUz": "Ai",
-      "contentRu": "Ai",
-      "duration": 20,
-      "order": 1,
-      "isFree": true,
-      "attachmentName": "Kurs_Dasturi.pdf",
-      "attachmentUrl": "#download"
-    },
-    {
-      "id": "les-1792831448694",
-      "moduleId": "mod-1792831448694",
-      "titleUz": "1.1. Kurs bilan tanishuv",
-      "titleRu": "1.1. Знакомство с курсом",
-      "type": "text",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "contentUz": "ncwfckjn",
-      "contentRu": "ncwfckjn",
-      "duration": 20,
-      "order": 1,
-      "isFree": true,
-      "attachmentName": "Kurs_Dasturi.pdf",
-      "attachmentUrl": "#download"
-    },
-    {
-      "id": "les-1792831509379",
-      "moduleId": "mod-1792831509379",
-      "titleUz": "1.1. Kurs bilan tanishuv",
-      "titleRu": "1.1. Знакомство с курсом",
-      "type": "text",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "contentUz": "aadsvd dcsx",
-      "contentRu": "aadsvd dcsx",
+      "id": "les-1792832319347",
+      "moduleId": "mod-1792832319347",
+      "titleUz": "1.1. AI video (Video dars)",
+      "titleRu": "1.1. Ai videoq (Видео урок)",
+      "type": "video",
+      "videoUrl": "blob:http://localhost:5173/9e8b6479-003a-4844-b9fb-0c3505c8acc7",
+      "videoName": "310148_medium.mp4",
+      "videoId": "vid-crs-1792832274613",
+      "contentUz": "Bu gogle flowdagi Ai video",
+      "contentRu": "Bu gogle flowdagi Ai video",
       "duration": 20,
       "order": 1,
       "isFree": true,
@@ -754,7 +660,7 @@
       "titleUz": "Assalomu alaykum hurmatli o'quvchi. Siz \"CodeCraft\" jamoasiga keldingiz. Biz sizni tabriklaymiz!",
       "titleRu": "Здравствуйте, уважаемый студент! Вы присоединились к команде \"CodeCraft\". Мы поздравляем вас!",
       "subtitleUz": "Zamonaviy dasturlash, sun'iy intellekt va raqamli kasblar olamiga xush kelibsiz. Tajribali ustozimiz Muhammaddiyor Orifjonov va ahil jamoamiz sizni yangi marralar sari mehr bilan yetaklaydi.",
-      "subtitleRu": "Добро пожаловать в мир современных IT-профессий, искусственного интеллекта и практических проектов. Наш наставник Мухаммаддиёр Орифжонов и вся команда помогут вам достичь больших целей.",
+      "subtitleRu": "Добро пожаловать в мир современных IT-профессий, искусственного интеллекта и практических проектов. Н��ш наставник Мухаммаддиёр Орифжонов и вся команда помогут вам достичь больших целей.",
       "ctaTextUz": "Kurslarni ko'rish",
       "ctaTextRu": "Смотреть курсы",
       "promoBadgeUz": "🌸 CodeCraft Jamoasi — Xush kelibsiz!",
@@ -768,7 +674,7 @@
       "questionUz": "Darslar qanday formatda o'tkaziladi va qancha vaqt saqlanadi?",
       "questionRu": "В каком формате проходят уроки и как долго доступен курс?",
       "answerUz": "Barcha darslar batafsil interaktiv matnli konspektlar, amaliy topshiriqlar va yuklab olinadigan materiallar ko'rinishida platformaga joylangan. Kursni xarid qilganingizdan so'ng darslarga 24/7 doimiy kirish huquqiga ega bo'lasiz.",
-      "answerRu": "Все уроки представлены в виде подробных интерактивных конспектов, практических заданий и дополнительных файлов. После покупки доступ к курсу остаётся у вас навсегда 24/7.",
+      "answerRu": "Все уроки представлены в виде подробных интерактивных конспектов, практических зад��ний и дополнительных файлов. После покупки доступ к курсу остаётся у вас навсегда 24/7.",
       "order": 1
     },
     {
@@ -823,6 +729,38 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1792832319347",
+      "userId": "usr-admin-1",
+      "userName": "admin",
+      "action": "COURSE_CREATED",
+      "details": "Kurs saqlandi: AI video",
+      "createdAt": "2026-10-24T08:58:39.347Z"
+    },
+    {
+      "id": "aud-1792832141695",
+      "userId": "usr-admin-1",
+      "userName": "admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792830893833) butunlay o'chirildi",
+      "createdAt": "2026-10-24T08:55:41.695Z"
+    },
+    {
+      "id": "aud-1792832139487",
+      "userId": "usr-admin-1",
+      "userName": "admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792831448670) butunlay o'chirildi",
+      "createdAt": "2026-10-24T08:55:39.487Z"
+    },
+    {
+      "id": "aud-1792832137006",
+      "userId": "usr-admin-1",
+      "userName": "admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792831509378) butunlay o'chirildi",
+      "createdAt": "2026-10-24T08:55:37.006Z"
+    },
     {
       "id": "aud-1792831509379",
       "userId": "usr-admin-1",
@@ -1312,5 +1250,10 @@
   },
   "smsCodes": {},
   "messages": [],
-  "invitations": []
+  "invitations": [],
+  "deletedCourseIds": [
+    "crs-1792831509378",
+    "crs-1792831448670",
+    "crs-1792830893833"
+  ]
 }

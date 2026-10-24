@@ -94,7 +94,7 @@ export function GlobalModals() {
           showToast(checkResult.error, 'error');
           return;
         }
-        setReceiptImage(dataUrl);
+        setReceiptImage(checkResult.compressedDataUrl || dataUrl);
         setReceiptError('');
         showToast(
           lang === 'ru' ? 'Чек успешно проверен и прикреплён!' : "To'lov cheki tekshirildi va muvaffaqiyatli biriktirildi!",
@@ -137,24 +137,26 @@ export function GlobalModals() {
       setTimeout(() => {
         const accountMask = (adminCardNumber || '8600 4912 8301 7724').trim();
 
-        // 1. Faqat pending to'lov yaratiladi! Kartaga pul tushmagunicha kurs ochilmaydi!
+        // 1. Pending to'lov yaratiladi va Admin panelidagi "Kurs sotib olmoqchi bo'lganlar" bo'limiga tushadi!
         createPendingPayment({
           courseId: checkoutCourse.id,
+          courseTitle: loc(checkoutCourse, 'title'),
+          courseThumbnail: checkoutCourse.thumbnail,
+          amount: basePrice,
           provider: 'card',
           accountMask,
           receiptImage
         });
 
         setIsProcessing(false);
-        setCheckoutCourse(null);
 
         showToast(
           lang === 'ru'
-            ? "Чек отправлен на проверку! Администратор проверит зачисление средств на карту и откроет курс."
-            : "To'lov chekingiz adminga yuborildi! Admin kartaga pul tushganini tekshirib tasdiqlagach kurs ochiladi.",
+            ? "Чек отправлен админу! Как только администратор подтвердит оплату, курс откроется прямо здесь."
+            : "To'lov chekingiz adminga yuborildi! Admin tasdiqlashi bilan shu oynada kurs ko'rish imkoniyati ochiladi.",
           'success'
         );
-      }, 700);
+      }, 500);
     }
 
     return (
@@ -185,27 +187,46 @@ export function GlobalModals() {
             </div>
 
             {isAlreadyEnrolled ? (
-              <div style={{ textAlign: 'center', padding: '24px 10px' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎓</div>
-                <h4 style={{ marginBottom: '8px' }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '24px 16px',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(5, 150, 105, 0.08))',
+                  border: '2px solid rgba(16, 185, 129, 0.5)',
+                  borderRadius: '14px'
+                }}
+              >
+                <div style={{ fontSize: '3rem', marginBottom: '8px' }}>🎉</div>
+                <h4 style={{ marginBottom: '8px', color: '#10b981', fontSize: '1.2rem', fontWeight: 800 }}>
                   {lang === 'ru'
-                    ? 'Вы уже приобрели этот курс!'
-                    : "Siz ushbu kursni allaqachon sotib olgansiz!"}
+                    ? 'Оплата подтверждена! Курс открыт для просмотра!'
+                    : "To'lov tasdiqlandi! Kurs ko'rish imkoniyati ochildi!"}
                 </h4>
-                <p className="text-muted" style={{ marginBottom: '20px', fontSize: '0.9rem' }}>
+                <p className="text-muted" style={{ marginBottom: '20px', fontSize: '0.92rem', lineHeight: '1.5' }}>
                   {lang === 'ru'
-                    ? 'Все видеоуроки и практические задания уже доступны в вашем кабинете.'
-                    : "Barcha darslar va topshiriqlar sizning shaxsiy kabinetingizda ochiq."}
+                    ? 'Администратор подтвердил поступление средств на карту. Все видеоуроки и материалы курса полностью открыты для вас.'
+                    : "Admin bank kartasiga pul tushganini tasdiqladi. Endi ushbu kursning barcha video darslarini bemalol ko'rishingiz mumkin!"}
                 </p>
                 <button
-                  className="btn btn-primary btn-block btn-lg"
+                  className="btn btn-success btn-block btn-lg"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '1.02rem',
+                    padding: '14px 20px',
+                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.35)'
+                  }}
                   onClick={() => {
-                    const cid = checkoutCourse.id;
+                    const targetCourseId = db.courses.some((c) => c.id === checkoutCourse.id)
+                      ? checkoutCourse.id
+                      : (db.courses[0]?.id || checkoutCourse.id);
                     setCheckoutCourse(null);
-                    navigate('learning', { courseId: cid });
+                    navigate('learning', { courseId: targetCourseId });
                   }}
                 >
-                  ▶ {lang === 'ru' ? 'Перейти к обучению' : "Darslarni boshlash"}
+                  ▶️ {lang === 'ru' ? 'Смотреть курс (Начать уроки)' : "Kursni ko'rish (Darslarni boshlash)"}
                 </button>
               </div>
             ) : isPendingApproval ? (

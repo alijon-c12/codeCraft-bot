@@ -30,8 +30,16 @@ function openDB() {
  */
 export async function saveVideoFile(id, file) {
   if (!id || !file) return null;
+  const cleanId = String(id).replace(/[^a-zA-Z0-9_-]/g, '');
   const objectUrl = URL.createObjectURL(file);
-  urlCache.set(id, objectUrl);
+  urlCache.set(cleanId, objectUrl);
+
+  // Upload to backend server so other browsers (Student / Chrome / Mobile) can also stream it
+  fetch(`/api/media/upload?id=${encodeURIComponent(cleanId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type || 'video/mp4' },
+    body: file
+  }).catch(() => {});
 
   try {
     const db = await openDB();
@@ -39,7 +47,7 @@ export async function saveVideoFile(id, file) {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const data = {
-        id,
+        id: cleanId,
         name: file.name || 'video.mp4',
         type: file.type || 'video/mp4',
         size: file.size || 0,
@@ -54,7 +62,7 @@ export async function saveVideoFile(id, file) {
     console.warn('Could not persist video in IndexedDB (session cache will be used):', err);
   }
 
-  return objectUrl;
+  return `/api/media/${cleanId}`;
 }
 
 /**
@@ -64,20 +72,21 @@ export async function saveVideoFile(id, file) {
  */
 export async function getVideoUrl(id) {
   if (!id) return null;
-  if (urlCache.has(id)) {
-    return urlCache.get(id);
+  const cleanId = String(id).replace(/[^a-zA-Z0-9_-]/g, '');
+  if (urlCache.has(cleanId)) {
+    return urlCache.get(cleanId);
   }
 
   try {
     const db = await openDB();
-    return new Promise((resolve) => {
+    const localUrl = await new Promise((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.get(id);
+      const req = store.get(cleanId);
       req.onsuccess = () => {
         if (req.result && req.result.blob) {
           const url = URL.createObjectURL(req.result.blob);
-          urlCache.set(id, url);
+          urlCache.set(cleanId, url);
           resolve(url);
         } else {
           resolve(null);
@@ -85,9 +94,40 @@ export async function getVideoUrl(id) {
       };
       req.onerror = () => resolve(null);
     });
+    if (localUrl) return localUrl;
   } catch {
-    return null;
+    // ignore
   }
+
+  // Fallback to server-hosted video URL for cross-browser playback
+  return `/api/media/${cleanId}`;
+}
+
+// Automatically sync any locally stored IndexedDB videos to the backend server
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+  setTimeout(async () => {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const items = req.result || [];
+        items.forEach((item) => {
+          if (item && item.id && item.blob) {
+            const cleanId = String(item.id).replace(/[^a-zA-Z0-9_-]/g, '');
+            fetch(`/api/media/upload?id=${encodeURIComponent(cleanId)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': item.type || 'video/mp4' },
+              body: item.blob
+            }).catch(() => {});
+          }
+        });
+      };
+    } catch {
+      // ignore
+    }
+  }, 1500);
 }
 
 /**

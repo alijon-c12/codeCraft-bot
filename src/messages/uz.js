@@ -249,6 +249,7 @@ export const uz = {
     title: "Admin Boshqaruv Markazi",
     tabs: {
       overview: "Dashboard & Statistika",
+      purchaseRequests: "Kurs sotib olmoqchi bo'lganlar",
       courses: "Kurslar boshqaruvi",
       users: "Foydalanuvchilar va Boshqaruv",
       homework: "Uy vazifalari",

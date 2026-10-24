@@ -587,8 +587,92 @@ export function createApiMiddleware() {
       return sendJson(res, 200, {
         ok: true,
         version: currentDbVersion,
-        coursesCount: (db.courses || []).length
+        coursesCount: (db.courses || []).length,
+        pendingPaymentsCount: (db.payments || []).filter((p) => p.status === 'pending').length
       });
+    }
+
+    // 0.2. POST /api/media/upload & GET /api/media/:id — Cross-browser video upload & streaming
+    const UPLOADS_DIR = path.join(__dirname, 'uploads');
+    if (pathname === '/api/media/upload' && req.method === 'POST') {
+      const videoId = (urlObj.searchParams.get('id') || `vid-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      }
+      const filePath = path.join(UPLOADS_DIR, `${videoId}.mp4`);
+      const writeStream = fs.createWriteStream(filePath);
+      req.pipe(writeStream);
+      writeStream.on('finish', () => {
+        sendJson(res, 200, { ok: true, id: videoId, url: `/api/media/${videoId}` });
+      });
+      writeStream.on('error', () => {
+        sendJson(res, 500, { ok: false, error: 'Failed to save video file' });
+      });
+      return;
+    }
+
+    if (pathname.startsWith('/api/media/') && req.method === 'GET') {
+      const videoId = pathname.slice('/api/media/'.length).replace(/[^a-zA-Z0-9_-]/g, '');
+      const filePath = path.join(UPLOADS_DIR, `${videoId}.mp4`);
+      if (!fs.existsSync(filePath)) {
+        return sendJson(res, 404, { error: 'Video not found on server' });
+      }
+      const stat = fs.statSync(filePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Type', 'video/mp4');
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = end - start + 1;
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Content-Length': chunksize
+        });
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Length': fileSize });
+        fs.createReadStream(filePath).pipe(res);
+      }
+      return;
+    }
+
+    // 0.3. POST /api/payments/notify-admin — Instant Telegram & system notification when student wants to buy a course
+    if (pathname === '/api/payments/notify-admin' && req.method === 'POST') {
+      const { userName, userPhone, courseTitle, amount, transactionId, adminCard } = await parseJsonBody(req);
+      loadDotEnv();
+      if (process.env.TELEGRAM_BOT_TOKEN) {
+        try {
+          const text =
+            `🛒 <b>YANGI KURS SOTIB OLISH SO'ROVI!</b>\n\n` +
+            `👤 O'quvchi: <b>${userName || 'Talaba'}</b>\n` +
+            `📞 Telefon: <code>${userPhone || "Ko'rsatilmagan"}</code>\n` +
+            `📚 Kurs: <b>${courseTitle || 'Kurs'}</b>\n` +
+            `💰 Summa: <b>${Number(amount || 0).toLocaleString('ru-RU')} so'm</b>\n` +
+            `💳 Karta: <code>${adminCard || '8600 4912 8301 7724'}</code>\n` +
+            `🆔 Tranzaksiya: <code>${transactionId || '-'}</code>\n\n` +
+            `✅ <i>Admin panelidagi "Kurs sotib olmoqchi bo'lganlar" bo'limidan kartaga pul tushganini tasdiqlang!</i>`;
+          const targetChatIds = new Set();
+          if (process.env.TELEGRAM_CHAT_ID) {
+            targetChatIds.add(String(process.env.TELEGRAM_CHAT_ID));
+          }
+          for (const sub of Object.values(db.telegramSubscribers || {})) {
+            if (sub && sub.chatId) {
+              targetChatIds.add(String(sub.chatId));
+            }
+          }
+          for (const chatId of targetChatIds) {
+            sendTelegramBotMessage(chatId, text).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+      }
+      notifyRealtimeClients('PAYMENT_REQUESTED', { userName, courseTitle, amount });
+      return sendJson(res, 200, { ok: true });
     }
 
     // 1. GET /api/state — Fetch complete application state
@@ -597,19 +681,135 @@ export function createApiMiddleware() {
       return sendJson(res, 200, { ...db, users: safeUsers });
     }
 
-    // 2. POST /api/sync — Persist updated state from client + server validation
+    // 2. POST /api/sync — Persist updated state from client + smart multi-browser merge
     if (pathname === '/api/sync' && req.method === 'POST') {
       const body = await parseJsonBody(req);
       if (body && body.db) {
-        // Preserve password hashes on existing users
-        const existingPasswords = new Map(db.users.map((u) => [u.id, u.passwordHash]));
-        const mergedUsers = (body.db.users || db.users).map((u) => ({
-          ...u,
-          passwordHash: u.passwordHash || existingPasswords.get(u.id) || 'student123'
-        }));
-        const nextDb = { ...db, ...body.db, users: mergedUsers };
+        const incoming = body.db;
+        const deletedCourseIds = Array.from(
+          new Set([...(db.deletedCourseIds || []), ...(incoming.deletedCourseIds || [])])
+        );
+        const deletedPaymentIds = Array.from(
+          new Set([...(db.deletedPaymentIds || []), ...(incoming.deletedPaymentIds || [])])
+        );
+        const deletedUserIds = Array.from(
+          new Set([...(db.deletedUserIds || []), ...(incoming.deletedUserIds || [])])
+        );
+
+        // Smart merge users (preserve users registered across different browsers)
+        const existingPasswords = new Map((db.users || []).map((u) => [u.id, u.passwordHash]));
+        const userMap = new Map();
+        for (const u of db.users || []) {
+          if (u && u.id && !deletedUserIds.includes(u.id)) userMap.set(u.id, u);
+        }
+        for (const u of incoming.users || []) {
+          if (u && u.id && !deletedUserIds.includes(u.id)) {
+            userMap.set(u.id, {
+              ...userMap.get(u.id),
+              ...u,
+              passwordHash: u.passwordHash || existingPasswords.get(u.id) || 'student123'
+            });
+          }
+        }
+        const mergedUsers = Array.from(userMap.values());
+
+        // Smart merge payments (never lose pending requests or confirmed status across browsers)
+        const payMap = new Map();
+        for (const p of db.payments || []) {
+          if (p && p.id && !deletedPaymentIds.includes(p.id)) payMap.set(p.id, p);
+        }
+        for (const p of incoming.payments || []) {
+          if (p && p.id && !deletedPaymentIds.includes(p.id)) {
+            const existing = payMap.get(p.id);
+            if (existing) {
+              const existingMod = existing._adminModified || 0;
+              const incomingMod = p._adminModified || 0;
+              if (existingMod > incomingMod) {
+                payMap.set(p.id, existing);
+              } else if (existing.status !== 'pending' && p.status === 'pending' && !p._adminModified) {
+                payMap.set(p.id, existing);
+              } else {
+                payMap.set(p.id, { ...existing, ...p });
+              }
+            } else {
+              payMap.set(p.id, p);
+            }
+          }
+        }
+        const mergedPayments = Array.from(payMap.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+
+        // Smart merge enrollments (keep all active enrollments unless user's payment was cancelled)
+        const cancelledUserCourses = new Set(
+          mergedPayments.filter((p) => p.status === 'cancelled').map((p) => `${p.userId}:${p.courseId}`)
+        );
+        const enrMap = new Map();
+        for (const e of [...(db.enrollments || []), ...(incoming.enrollments || [])]) {
+          if (e && e.id && !deletedCourseIds.includes(e.courseId)) {
+            if (!cancelledUserCourses.has(`${e.userId}:${e.courseId}`) && !cancelledUserCourses.has(`${e.userId}:all`)) {
+              enrMap.set(`${e.userId}:${e.courseId}`, e);
+            }
+          }
+        }
+        const mergedEnrollments = Array.from(enrMap.values());
+
+        // Smart merge courses, modules, lessons (respecting deletedCourseIds)
+        const crsMap = new Map();
+        for (const c of [...(db.courses || []), ...(incoming.courses || [])]) {
+          if (c && c.id && !deletedCourseIds.includes(c.id)) {
+            crsMap.set(c.id, { ...crsMap.get(c.id), ...c });
+          }
+        }
+        const mergedCourses = Array.from(crsMap.values());
+
+        const validCourseIds = new Set(mergedCourses.map((c) => c.id));
+        const modMap = new Map();
+        for (const m of [...(db.modules || []), ...(incoming.modules || [])]) {
+          if (m && m.id && validCourseIds.has(m.courseId)) {
+            modMap.set(m.id, { ...modMap.get(m.id), ...m });
+          }
+        }
+        const mergedModules = Array.from(modMap.values());
+
+        const validModIds = new Set(mergedModules.map((m) => m.id));
+        const lesMap = new Map();
+        for (const l of [...(db.lessons || []), ...(incoming.lessons || [])]) {
+          if (l && l.id && validModIds.has(l.moduleId)) {
+            lesMap.set(l.id, { ...lesMap.get(l.id), ...l });
+          }
+        }
+        const mergedLessons = Array.from(lesMap.values());
+
+        // Smart merge notifications
+        const notifMap = new Map();
+        for (const n of [...(incoming.notifications || []), ...(db.notifications || [])]) {
+          if (n && n.id) {
+            const prev = notifMap.get(n.id);
+            notifMap.set(n.id, prev ? { ...prev, ...n, read: Boolean(prev.read || n.read) } : n);
+          }
+        }
+        const mergedNotifications = Array.from(notifMap.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+
+        const nextDb = {
+          ...db,
+          ...incoming,
+          users: mergedUsers,
+          payments: mergedPayments,
+          enrollments: mergedEnrollments,
+          courses: mergedCourses,
+          modules: mergedModules,
+          lessons: mergedLessons,
+          notifications: mergedNotifications,
+          deletedCourseIds,
+          deletedPaymentIds,
+          deletedUserIds
+        };
         writeDb(nextDb);
-        return sendJson(res, 200, { ok: true });
+        const safeUsers = nextDb.users.map(({ passwordHash: _passwordHash, ...u }) => u);
+        return sendJson(res, 200, { ok: true, version: currentDbVersion, db: { ...nextDb, users: safeUsers } });
       }
       return sendJson(res, 400, { error: 'Invalid sync payload' });
     }
