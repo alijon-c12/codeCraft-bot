@@ -41,10 +41,12 @@ export function Navbar() {
     <header className="navbar">
       <div className="container navbar-inner">
         <button className="brand-logo" onClick={() => handleNav(currentUser ? 'courses' : 'home')}>
-          <div className="brand-logo-42-badge">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M5 3L15 3L9 13H17L7 23L11 15H3L5 3Z" fill="#ff5722"/>
-            </svg>
+          <div className="brand-logo-42-badge" style={{ padding: 0, overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img
+              src="/favicon.png"
+              alt="CodeCraft"
+              style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+            />
           </div>
           <div className="brand-text">
             <span className="brand-name">CodeCraft</span>
