@@ -23,6 +23,7 @@ export function GlobalModals() {
     setPreviewLesson,
     activeCertificate,
     setActiveCertificate,
+    deleteCertificate,
     navigate,
     showToast,
     lang
@@ -593,6 +594,27 @@ export function GlobalModals() {
             <div className="modal-actions-row">
               <button className="btn btn-primary" onClick={() => window.print()}>
                 🖨️ {lang === 'ru' ? 'Скачать PDF / Печать' : 'PDF yuklab olish / Chop etish'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{
+                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  color: '#ef4444',
+                  background: 'rgba(239, 68, 68, 0.08)'
+                }}
+                onClick={() => {
+                  const confirmMsg = lang === 'ru'
+                    ? `Удалить сертификат ${activeCertificate.code}?`
+                    : `Haqiqatan ham ${activeCertificate.code} sertifikatini o'chirmoqchimisiz?`;
+                  if (window.confirm(confirmMsg)) {
+                    const certId = activeCertificate.id;
+                    setActiveCertificate(null);
+                    deleteCertificate(certId);
+                  }
+                }}
+              >
+                🗑️ {lang === 'ru' ? 'Удалить' : "O'chirish"}
               </button>
               <button className="btn btn-outline" onClick={() => setActiveCertificate(null)}>
                 {lang === 'ru' ? 'Закрыть' : 'Yopish'}

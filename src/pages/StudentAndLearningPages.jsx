@@ -12,6 +12,7 @@ export function StudentDashboardPage() {
     navigate,
     getCourseProgress,
     setActiveCertificate,
+    deleteCertificate,
     updateProfile,
     markNotificationsRead,
     deleteNotification,
@@ -499,22 +500,46 @@ export function StudentDashboardPage() {
               <div className="certs-grid">
                 {myCertificates.map((cert) => {
                   const course = db.courses.find((c) => c.id === cert.courseId);
+                  const title = course ? loc(course, 'title') : (cert.courseTitle || 'Kurs Sertifikati');
                   return (
                     <div key={cert.id} className="cert-item-card">
                       <div className="cert-badge-icon">🎓</div>
-                      <div>
-                        <h3>{loc(course, 'title')}</h3>
+                      <div style={{ flex: 1 }}>
+                        <h3>{title}</h3>
                         <p className="text-muted">
                           {lang === 'ru' ? 'ID Код:' : 'ID Kod:'} <code>{cert.code}</code> •{' '}
                           {lang === 'ru' ? 'Дата:' : 'Sana:'}{' '}
                           {new Date(cert.issuedAt).toLocaleDateString()}
                         </p>
-                        <button
-                          className="btn btn-primary btn-sm mt-2"
-                          onClick={() => setActiveCertificate(cert)}
-                        >
-                          📄 {t.dashboard.downloadCert}
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => setActiveCertificate(cert)}
+                          >
+                            📄 {t.dashboard.downloadCert}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            style={{
+                              borderColor: 'rgba(239, 68, 68, 0.4)',
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              color: '#ef4444',
+                              fontWeight: 600
+                            }}
+                            onClick={() => {
+                              const confirmMsg = lang === 'ru'
+                                ? `Вы действительно хотите удалить сертификат ${cert.code}?`
+                                : `Haqiqatan ham ${cert.code} sertifikatini o'chirmoqchimisiz?`;
+                              if (window.confirm(confirmMsg)) {
+                                deleteCertificate(cert.id);
+                              }
+                            }}
+                          >
+                            🗑️ {lang === 'ru' ? 'Удалить' : "O'chirish"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

@@ -802,6 +802,26 @@ export function AppProvider({ children }) {
     });
   }
 
+  function deleteCertificate(certificateId) {
+    if (!certificateId) return;
+    updateDb(
+      (draft) => {
+        draft.certificates = (draft.certificates || []).filter(
+          (c) => c.id !== certificateId && c.code !== certificateId
+        );
+        return draft;
+      },
+      {
+        action: 'CERTIFICATE_DELETED',
+        details: `Sertifikat (${certificateId}) o'chirildi`
+      }
+    );
+    if (activeCertificate?.id === certificateId || activeCertificate?.code === certificateId) {
+      setActiveCertificate(null);
+    }
+    showToast(lang === 'ru' ? 'Сертификат успешно удален' : "Sertifikat o'chirildi", 'info');
+  }
+
   // QUIZ & HOMEWORK
   function submitQuizAttempt(quizId, score, passed) {
     if (!currentUser) return;
@@ -2067,6 +2087,7 @@ export function AppProvider({ children }) {
         setPreviewLesson,
         activeCertificate,
         setActiveCertificate,
+        deleteCertificate,
         toast,
         showToast,
         login,

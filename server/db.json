@@ -46,7 +46,31 @@
       "icon": "palette"
     }
   ],
-  "courses": [],
+  "courses": [
+    {
+      "id": "crs-1792830893833",
+      "titleUz": "AI",
+      "titleRu": "AI",
+      "slug": "ai",
+      "descriptionUz": "Ai",
+      "descriptionRu": "Ai",
+      "price": 100000,
+      "discountPrice": null,
+      "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
+      "level": "advanced",
+      "language": "O'zbek / Русский",
+      "status": "published",
+      "teacherId": "usr-teacher-1",
+      "categoryId": "cat-ai-data",
+      "durationHours": 40,
+      "studentsCount": 0,
+      "rating": 5,
+      "createdAt": "2026-10-24T08:34:53.834Z"
+    }
+  ],
   "modules": [
     {
       "id": "mod-201",
@@ -107,6 +131,13 @@
     {
       "id": "mod-1792778142182",
       "courseId": "crs-1792778142182",
+      "titleUz": "1-modul: Darslar va Amaliyot",
+      "titleRu": "Модуль 1: Уроки и практика",
+      "order": 1
+    },
+    {
+      "id": "mod-1792830893835",
+      "courseId": "crs-1792830893833",
       "titleUz": "1-modul: Darslar va Amaliyot",
       "titleRu": "Модуль 1: Уроки и практика",
       "order": 1
@@ -255,6 +286,23 @@
       "videoId": "",
       "contentUz": "Kurs",
       "contentRu": "Kurs",
+      "duration": 20,
+      "order": 1,
+      "isFree": true,
+      "attachmentName": "Kurs_Dasturi.pdf",
+      "attachmentUrl": "#download"
+    },
+    {
+      "id": "les-1792830893835",
+      "moduleId": "mod-1792830893835",
+      "titleUz": "1.1. Kurs bilan tanishuv",
+      "titleRu": "1.1. Знакомство с курсом",
+      "type": "text",
+      "videoUrl": "",
+      "videoName": "",
+      "videoId": "",
+      "contentUz": "Ai",
+      "contentRu": "Ai",
       "duration": 20,
       "order": 1,
       "isFree": true,
@@ -477,6 +525,13 @@
       "lessonId": "les-1792601767894",
       "completed": true,
       "updatedAt": "2026-10-22T15:13:20.290Z"
+    },
+    {
+      "id": "lp-1792830921787",
+      "userId": "usr-admin-1",
+      "lessonId": "les-1792830893835",
+      "completed": true,
+      "updatedAt": "2026-10-24T08:35:21.787Z"
     }
   ],
   "submissions": [],
@@ -550,6 +605,13 @@
     }
   ],
   "certificates": [
+    {
+      "id": "cert-1792830921787",
+      "userId": "usr-admin-1",
+      "courseId": "crs-1792830893833",
+      "code": "EC-2026-H9UORG",
+      "issuedAt": "2026-10-24T08:35:21.787Z"
+    },
     {
       "id": "cert-1792682000290",
       "userId": "usr-admin-1",
@@ -659,6 +721,14 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1792830893835",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_CREATED",
+      "details": "Kurs saqlandi: AI",
+      "createdAt": "2026-10-24T08:34:53.835Z"
+    },
     {
       "id": "aud-1792829940013",
       "userId": "usr-admin-1",
@@ -965,6 +1035,13 @@
     }
   ],
   "notificationLogs": [
+    {
+      "id": "nlog-1792830921787",
+      "channel": "EMAIL_SMTP",
+      "recipient": "+998 95 163 91 01",
+      "message": "🎓 Yangi PDF Sertifikat yaratildi: EC-2026-H9UORG (AI)",
+      "createdAt": "2026-10-24T08:35:21.787Z"
+    },
     {
       "id": "nlog-1792776964488",
       "channel": "SMS_GATEWAY",
