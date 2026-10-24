@@ -600,6 +600,7 @@ export function AdminPanelPage() {
 
   const paidPayments = (db.payments || []).filter((p) => p.status === 'paid');
   const pendingPayments = (db.payments || []).filter((p) => p.status === 'pending');
+  const returnedPayments = (db.payments || []).filter((p) => p.status === 'returned');
   const totalRevenue = paidPayments.reduce((s, p) => s + p.amount, 0);
 
   return (
@@ -771,6 +772,11 @@ export function AdminPanelPage() {
                 <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', padding: '8px 14px', borderRadius: '10px', fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>
                   ✅ {lang === 'ru' ? 'Подтверждено (Курс открыт):' : 'Tasdiqlangan (Kurs ochilgan):'} {paidPayments.length} {lang === 'ru' ? 'чел.' : 'ta'}
                 </div>
+                {returnedPayments.length > 0 && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '8px 14px', borderRadius: '10px', fontWeight: 700, color: '#ef4444', fontSize: '0.88rem' }}>
+                    🔄 {lang === 'ru' ? 'Возвращено студентами:' : "Qaytarilgan kurslar:"} {returnedPayments.length} {lang === 'ru' ? 'чел.' : 'ta'}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -803,6 +809,7 @@ export function AdminPanelPage() {
                   const courseThumb = crs?.thumbnail || p.courseThumbnail || db.courses[0]?.thumbnail || '';
                   const isPaid = p.status === 'paid';
                   const isPending = p.status === 'pending';
+                  const isReturned = p.status === 'returned';
 
                   return (
                     <div
@@ -815,9 +822,13 @@ export function AdminPanelPage() {
                           ? '2px solid rgba(245, 158, 11, 0.65)'
                           : isPaid
                           ? '1.5px solid rgba(16, 185, 129, 0.45)'
+                          : isReturned
+                          ? '1.5px solid rgba(239, 68, 68, 0.5)'
                           : '1px solid rgba(239, 68, 68, 0.35)',
                         background: isPending
                           ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(15, 23, 42, 0.9))'
+                          : isReturned
+                          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(15, 23, 42, 0.9))'
                           : 'var(--surface)',
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -919,6 +930,8 @@ export function AdminPanelPage() {
                               ? 'rgba(16, 185, 129, 0.18)'
                               : isPending
                               ? 'rgba(245, 158, 11, 0.2)'
+                              : isReturned
+                              ? 'rgba(239, 68, 68, 0.2)'
                               : 'rgba(239, 68, 68, 0.18)',
                             color: isPaid ? '#10b981' : isPending ? '#fbbf24' : '#ef4444'
                           }}
@@ -927,10 +940,75 @@ export function AdminPanelPage() {
                             ? (lang === 'ru' ? '✅ ОПЛАТА ПОДТВЕРЖДЕНА (КУРС ОТКРЫТ)' : "✅ PUL TUSHGANI TASDIQLANDI (KURS OCHIQ)")
                             : isPending
                             ? (lang === 'ru' ? '⏳ ОЖИДАЕТ ВАШЕГО ПОДТВЕРЖДЕНИЯ' : "⏳ TASDIQLASHINGIZ KUTILMOQDA")
+                            : isReturned
+                            ? (lang === 'ru' ? '🔄 КУРС ВОЗВРАЩЁН СТУДЕНТОМ (ДОСТУП ЗАКРЫТ)' : "🔄 TALABA KURSNI ADMINGA QAYTARDI (KURS YOPILGAN)")
                             : (lang === 'ru' ? '❌ ОТКЛОНЕНО (ДЕНЕГ НЕТ)' : "❌ RAD ETILGAN (PUL TUSHMADI)")}
                         </span>
 
-                        {!isPaid && (
+                        {isPending && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-success"
+                              onClick={() => adminConfirmPayment(p.id)}
+                              style={{
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                color: '#fff',
+                                border: 'none',
+                                fontWeight: 800,
+                                padding: '10px 18px',
+                                borderRadius: '10px',
+                                boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
+                                width: '100%',
+                                maxWidth: '280px'
+                              }}
+                            >
+                              ✅ {lang === 'ru' ? 'Подтвердить (Деньги поступили — Открыть курс)' : "Tasdiqlash (Kartaga pul tushdi — Kursni ochish)"}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline"
+                              onClick={() => adminCancelPayment(p.id)}
+                              style={{
+                                color: '#ef4444',
+                                borderColor: 'rgba(239, 68, 68, 0.45)',
+                                width: '100%',
+                                maxWidth: '280px'
+                              }}
+                            >
+                              ✕ {lang === 'ru' ? 'Отклонить (Деньги не поступили)' : "Rad etish (Kartaga pul tushmadi)"}
+                            </button>
+                          </>
+                        )}
+
+                        {isReturned && (
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-outline"
+                              onClick={() => adminConfirmPayment(p.id)}
+                              style={{ color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.45)' }}
+                              title={lang === 'ru' ? 'Заново открыть доступ к курсу для студента' : "Talaba uchun kursni qayta ochish"}
+                            >
+                              ✅ {lang === 'ru' ? 'Возобновить доступ' : 'Qayta ochish'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              style={{ color: '#ef4444' }}
+                              onClick={() => {
+                                if (window.confirm(lang === 'ru' ? 'Удалить эту запись о возврате?' : "Ushbu qaytarish yozuvini o'chirmoqchimisiz?")) {
+                                  adminDeletePayment(p.id);
+                                }
+                              }}
+                            >
+                              🗑️ {lang === 'ru' ? 'Удалить' : "O'chirish"}
+                            </button>
+                          </div>
+                        )}
+
+                        {!isPaid && !isPending && !isReturned && (
                           <button
                             type="button"
                             className="btn btn-success"
@@ -947,23 +1025,7 @@ export function AdminPanelPage() {
                               maxWidth: '280px'
                             }}
                           >
-                            ✅ {lang === 'ru' ? 'Подтвердить (Деньги поступили — Открыть курс)' : "Tasdiqlash (Kartaga pul tushdi — Kursni ochish)"}
-                          </button>
-                        )}
-
-                        {isPending && (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline"
-                            onClick={() => adminCancelPayment(p.id)}
-                            style={{
-                              color: '#ef4444',
-                              borderColor: 'rgba(239, 68, 68, 0.45)',
-                              width: '100%',
-                              maxWidth: '280px'
-                            }}
-                          >
-                            ✕ {lang === 'ru' ? 'Отклонить (Деньги не поступили)' : "Rad etish (Kartaga pul tushmadi)"}
+                            ✅ {lang === 'ru' ? 'Открыть курс' : "Kursni ochish"}
                           </button>
                         )}
 
@@ -1987,6 +2049,7 @@ export function AdminPanelPage() {
                   </option>
                   <option value="paid">{lang === 'ru' ? "✅ Только оплаченные (Paid)" : "✅ Faqat to'langanlar (Paid)"}</option>
                   <option value="pending">{lang === 'ru' ? "⏳ Только ожидающие (Pending)" : "⏳ Faqat kutilayotganlar (Pending)"}</option>
+                  <option value="returned">{lang === 'ru' ? "🔄 Только возвращённые (Returned)" : "🔄 Faqat qaytarilganlar (Returned)"}</option>
                   <option value="cancelled">{lang === 'ru' ? "❌ Только отменённые (Cancelled)" : "❌ Faqat bekor qilinganlar (Cancelled)"}</option>
                   <option value="payme">{lang === 'ru' ? "💳 Только Payme" : "💳 Faqat Payme"}</option>
                   <option value="click">{lang === 'ru' ? "💳 Только Click" : "💳 Faqat Click"}</option>
@@ -2032,6 +2095,7 @@ export function AdminPanelPage() {
                         if (payFilter === 'all') return true;
                         if (payFilter === 'paid') return p.status === 'paid';
                         if (payFilter === 'pending') return p.status === 'pending';
+                        if (payFilter === 'returned') return p.status === 'returned';
                         if (payFilter === 'cancelled') return p.status === 'cancelled';
                         return true;
                       })
@@ -2042,6 +2106,7 @@ export function AdminPanelPage() {
                           : (db.courses || []).find((c) => c.id === p.courseId);
                         const isPaid = p.status === 'paid';
                         const isPending = p.status === 'pending';
+                        const isReturned = p.status === 'returned';
 
                         return (
                           <tr key={p.id}>
@@ -2104,7 +2169,7 @@ export function AdminPanelPage() {
                                   padding: '3px 8px',
                                   borderRadius: '6px',
                                   fontWeight: '600',
-                                  backgroundColor: isPaid ? 'rgba(16, 185, 129, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                  backgroundColor: isPaid ? 'rgba(16, 185, 129, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : isReturned ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.15)',
                                   color: isPaid ? '#10b981' : isPending ? '#f59e0b' : '#ef4444'
                                 }}
                               >
@@ -2112,6 +2177,8 @@ export function AdminPanelPage() {
                                   ? (lang === 'ru' ? "✅ ОПЛАЧЕН" : "✅ TO'LANGAN")
                                   : isPending
                                   ? (lang === 'ru' ? "⏳ ОЖИДАЕТ" : "⏳ KUTILMOQDA")
+                                  : isReturned
+                                  ? (lang === 'ru' ? "🔄 ВОЗВРАЩЁН" : "🔄 QAYTARILGAN")
                                   : (lang === 'ru' ? "❌ ОТМЕНЁН" : "❌ BEKOR QILINGAN")}
                               </span>
                             </td>

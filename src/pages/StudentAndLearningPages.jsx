@@ -254,14 +254,7 @@ export function StudentDashboardPage() {
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            onClick={() => {
-                              const msg = lang === 'ru'
-                                ? 'Вы действительно хотите вернуть этот курс администратору? Доступ к материалам будет закрыт.'
-                                : "Haqiqatan ham bu kursni adminga qaytarmoqchimisiz? Kurs materiallariga kirish yopiladi.";
-                              if (window.confirm(msg)) {
-                                returnCourseToAdmin(course.id);
-                              }
-                            }}
+                            onClick={() => returnCourseToAdmin(course.id)}
                             style={{
                               borderColor: 'rgba(239, 68, 68, 0.45)',
                               color: '#ef4444',
@@ -1292,14 +1285,7 @@ export function MyCoursesPage() {
                       <button
                         type="button"
                         className="btn btn-outline btn-sm btn-block"
-                        onClick={() => {
-                          const msg = lang === 'ru'
-                            ? 'Вы действительно хотите вернуть этот курс администратору? Доступ к урокам будет закрыт.'
-                            : "Haqiqatan ham ushbu kursni adminga qaytarmoqchimisiz? Kurs darslariga kirish to'xtatiladi.";
-                          if (window.confirm(msg)) {
-                            returnCourseToAdmin(course.id);
-                          }
-                        }}
+                        onClick={() => returnCourseToAdmin(course.id)}
                         style={{
                           borderColor: 'rgba(239, 68, 68, 0.45)',
                           color: '#ef4444',

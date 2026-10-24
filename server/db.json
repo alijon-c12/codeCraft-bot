@@ -325,13 +325,6 @@
       "courseId": "crs-1792600850392",
       "status": "completed",
       "createdAt": "2026-10-21T16:42:00.797Z"
-    },
-    {
-      "id": "enr-all-1792834703539",
-      "userId": "usr-1792831353065",
-      "courseId": "all",
-      "status": "active",
-      "createdAt": "2026-10-24T09:38:23.539Z"
     }
   ],
   "lessonProgress": [
@@ -386,7 +379,24 @@
     }
   ],
   "quizAttempts": [],
-  "payments": [],
+  "payments": [
+    {
+      "id": "pay-ret-1792859818871",
+      "userId": "usr-1792831353065",
+      "userName": "Clent",
+      "userPhone": "+998 50 1178192",
+      "courseId": "crs-1792848899550",
+      "courseTitle": "AI",
+      "courseThumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
+      "amount": 5,
+      "provider": "return",
+      "status": "returned",
+      "accountMask": "8600 4912 8301 7724",
+      "transactionId": "RET-818871",
+      "createdAt": "2026-10-24T16:36:58.871Z",
+      "_adminModified": 1792859818871
+    }
+  ],
   "promoCodes": [
     {
       "id": "prm-1",
@@ -455,7 +465,32 @@
     }
   ],
   "certificates": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "notif-adm-1792859818871",
+      "userId": "usr-admin-1",
+      "textUz": "🔄 Talaba Clent (+998 50 1178192) \"AI\" kursini adminga qaytardi. Kursga kirish yopildi.",
+      "textRu": "🔄 Студент Clent (+998 50 1178192) вернул курс \"AI\" администратору. Доступ закрыт.",
+      "read": false,
+      "createdAt": "2026-10-24T16:36:58.871Z"
+    },
+    {
+      "id": "notif-adm-1792859787400",
+      "userId": "usr-admin-1",
+      "textUz": "🔄 Talaba Clent (+998 50 1178192) \"AI\" kursini adminga qaytardi. Kursga kirish yopildi.",
+      "textRu": "🔄 Студент Clent (+998 50 1178192) вернул курс \"AI\" администратору. Доступ закрыт.",
+      "read": false,
+      "createdAt": "2026-10-24T16:36:27.400Z"
+    },
+    {
+      "id": "notif-adm-1792859765274",
+      "userId": "usr-admin-1",
+      "textUz": "🔄 Talaba Clent (+998 50 1178192) \"AI\" kursini adminga qaytardi. Kursga kirish yopildi.",
+      "textRu": "🔄 Студент Clent (+998 50 1178192) вернул курс \"AI\" администратору. Доступ закрыт.",
+      "read": false,
+      "createdAt": "2026-10-24T16:36:05.278Z"
+    }
+  ],
   "leads": [
     {
       "id": "lead-1",
@@ -537,7 +572,7 @@
       "titleUz": "Maxfiylik siyosati",
       "titleRu": "Политика конфиденциальности",
       "contentUz": "1. Umumiy qoidalar: EduCenter foydalanuvchilarning shaxsiy ma'lumotlari (ism, telefon raqam, email va to'lov tarixi) xavfsizligini O'zbekiston Respublikasi qonunchiligiga muvofiq himoya qiladi.\n2. Ma'lumotlardan foydalanish: Shaxsiy ma'lumotlar faqat o'quv jarayonini tashkil etish, sertifikat rasmiylashtirish va bildirishnomalar yuborish uchun ishlatiladi.\n3. Axborot xavfsizligi: Barcha parollar shifrlangan holda saqlanadi va to'lov operatsiyalari rasmiy Payme/Click shlyuzlari orqali amalga oshiriladi.",
-      "contentRu": "1. Общие положения: EduCenter обеспечив��ет защи��у персональных да��������ных пользователей (имя, телефон, email, история транзакций) в соответствии с законодательством Республики Узбекистан.\n2. Использование данных: Данные используются исключительно для предоставления доступа к курсам, выдачи сертификатов и отправки уведомлений.\n3. Безопасность: Пароли хранятся в зашифрованном виде, а платежи проходят через сертифицированные шлюзы Payme и Click."
+      "contentRu": "1. Общие положения: EduCenter обеспечив��ет защи��у персональных да����������ных пользователей (имя, телефон, email, история транзакций) в соответствии с законодательством Республики Узбекистан.\n2. Использование данных: Данные используются исключительно для предоставления доступа к курсам, выдачи сертификатов и отправки уведомлений.\n3. Безопасность: Пароли хранятся в зашифрованном виде, а платежи проходят через сертифицированные шлюзы Payme и Click."
     },
     {
       "id": "pg-terms",
@@ -549,6 +584,30 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1792859818871",
+      "userId": "usr-1792831353065",
+      "userName": "Clent",
+      "action": "COURSE_RETURNED_BY_STUDENT",
+      "details": "Talaba (Clent) \"AI\" kursini adminga qaytardi",
+      "createdAt": "2026-10-24T16:36:58.871Z"
+    },
+    {
+      "id": "aud-1792859787400",
+      "userId": "usr-1792831353065",
+      "userName": "Clent",
+      "action": "COURSE_RETURNED_BY_STUDENT",
+      "details": "Talaba (Clent) \"AI\" kursini adminga qaytardi",
+      "createdAt": "2026-10-24T16:36:27.400Z"
+    },
+    {
+      "id": "aud-1792859765286",
+      "userId": "usr-1792831353065",
+      "userName": "Clent",
+      "action": "COURSE_RETURNED_BY_STUDENT",
+      "details": "Talaba (Clent) \"AI\" kursini adminga qaytardi",
+      "createdAt": "2026-10-24T16:36:05.286Z"
+    },
     {
       "id": "aud-1792848899553",
       "userId": "usr-admin-1",
@@ -1302,6 +1361,39 @@
       "text": "Assalomu alaykum ustoz!",
       "createdAt": "2026-10-24T09:47:14.456Z",
       "read": true
+    },
+    {
+      "id": "msg-1792858737633-723",
+      "senderId": "usr-admin-1",
+      "senderName": "admin",
+      "senderRole": "admin",
+      "recipientId": "usr-1792831353065",
+      "recipientName": "Clent",
+      "text": "To'lovingiz tasdiqlandi, kursingiz ochildi! 🎉",
+      "createdAt": "2026-10-24T16:18:57.634Z",
+      "read": true
+    },
+    {
+      "id": "msg-1792858775113-430",
+      "senderId": "usr-1792831353065",
+      "senderName": "Clent",
+      "senderRole": "student",
+      "recipientId": "usr-admin-1",
+      "recipientName": "admin",
+      "text": "hop raxmat",
+      "createdAt": "2026-10-24T16:19:35.117Z",
+      "read": false
+    },
+    {
+      "id": "msg-1792858819586-874",
+      "senderId": "usr-admin-1",
+      "senderName": "admin",
+      "senderRole": "admin",
+      "recipientId": "usr-1792831353065",
+      "recipientName": "Clent",
+      "text": "To'lovingiz tasdiqlandi, kursingiz ochildi! 🎉",
+      "createdAt": "2026-10-24T16:20:19.588Z",
+      "read": false
     }
   ],
   "invitations": [],
@@ -1317,6 +1409,9 @@
     "crs-1792834891606",
     "crs-1792834891654",
     "crs-1792848610891"
+  ],
+  "deletedEnrollmentIds": [
+    "enr-all-1792834703539"
   ],
   "deletedPaymentIds": [
     "pay-1792831617224"

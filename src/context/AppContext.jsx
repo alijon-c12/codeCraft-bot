@@ -145,6 +145,9 @@ function sanitizeDb(data) {
   if (Array.isArray(clone.deletedPaymentIds) && clone.deletedPaymentIds.length > 0) {
     clone.payments = clone.payments.filter((p) => !clone.deletedPaymentIds.includes(p.id));
   }
+  if (Array.isArray(clone.deletedEnrollmentIds) && clone.deletedEnrollmentIds.length > 0 && Array.isArray(clone.enrollments)) {
+    clone.enrollments = clone.enrollments.filter((e) => !clone.deletedEnrollmentIds.includes(e.id));
+  }
   if (Array.isArray(clone.deletedCertificateIds) && clone.deletedCertificateIds.length > 0 && Array.isArray(clone.certificates)) {
     clone.certificates = clone.certificates.filter((c) => !clone.deletedCertificateIds.includes(c.id));
   }
@@ -263,6 +266,9 @@ export function AppProvider({ children }) {
       messages: mergedMessages,
       deletedCourseIds: Array.from(
         new Set([...(prev?.deletedCourseIds || []), ...(rawDb?.deletedCourseIds || [])])
+      ),
+      deletedEnrollmentIds: Array.from(
+        new Set([...(prev?.deletedEnrollmentIds || []), ...(rawDb?.deletedEnrollmentIds || [])])
       ),
       deletedPaymentIds: Array.from(
         new Set([...(prev?.deletedPaymentIds || []), ...(rawDb?.deletedPaymentIds || [])])
@@ -924,7 +930,7 @@ export function AppProvider({ children }) {
 
   function returnCourseToAdmin(courseId) {
     if (!currentUser || !courseId) return;
-    const course = db.courses.find((c) => c.id === courseId);
+    const course = (db.courses || []).find((c) => c.id === courseId);
     const courseTitle = course ? loc(course, 'title') : 'Kurs';
 
     const confirmMsg = lang === 'ru'
@@ -935,18 +941,71 @@ export function AppProvider({ children }) {
 
     updateDb(
       (draft) => {
-        // 1. Remove enrollment
+        draft.deletedEnrollmentIds = draft.deletedEnrollmentIds || [];
+
+        // Identify existing enrollments for this user
+        const userEnrollments = (draft.enrollments || []).filter((e) => e.userId === currentUser.id);
+        const hadAllAccess = userEnrollments.some((e) => e.courseId === 'all');
+
+        // Collect enrollment IDs to delete
+        userEnrollments.forEach((e) => {
+          if (e.courseId === courseId || e.courseId === 'all') {
+            if (!draft.deletedEnrollmentIds.includes(e.id)) {
+              draft.deletedEnrollmentIds.push(e.id);
+            }
+          }
+        });
+
+        // 1. Remove enrollment for this course and remove 'all' enrollment
         draft.enrollments = (draft.enrollments || []).filter(
           (e) => !(e.userId === currentUser.id && (e.courseId === courseId || e.courseId === 'all'))
         );
 
-        // 2. Mark payments for this course as cancelled/refunded
-        (draft.payments || []).forEach((p) => {
-          if (p.userId === currentUser.id && (p.courseId === courseId || p.courseId === 'all')) {
-            p.status = 'cancelled';
-            p._adminModified = Date.now();
-          }
-        });
+        // If user had 'all' access, keep separate enrollments for all other published courses
+        if (hadAllAccess) {
+          const otherCourses = (draft.courses || []).filter((c) => c.id !== courseId && c.status === 'published');
+          otherCourses.forEach((c) => {
+            if (!draft.enrollments.some((e) => e.userId === currentUser.id && e.courseId === c.id)) {
+              draft.enrollments.push({
+                id: `enr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                userId: currentUser.id,
+                courseId: c.id,
+                status: 'active',
+                createdAt: new Date().toISOString()
+              });
+            }
+          });
+        }
+
+        // 2. Mark payments as returned or create a returned payment entry for admin to see
+        draft.payments = draft.payments || [];
+        let matchingPayment = draft.payments.find(
+          (p) => p.userId === currentUser.id && (p.courseId === courseId || p.courseId === 'all')
+        );
+
+        if (matchingPayment) {
+          matchingPayment.status = 'returned';
+          matchingPayment.courseId = courseId;
+          matchingPayment.courseTitle = courseTitle;
+          matchingPayment._adminModified = Date.now();
+        } else {
+          draft.payments.unshift({
+            id: `pay-ret-${Date.now()}`,
+            userId: currentUser.id,
+            userName: currentUser.name,
+            userPhone: currentUser.phone || '',
+            courseId: courseId,
+            courseTitle: courseTitle,
+            courseThumbnail: course?.thumbnail || '',
+            amount: course?.discountPrice || course?.price || 0,
+            provider: 'return',
+            status: 'returned',
+            accountMask: adminCardNumber || '8600 4912 8301 7724',
+            transactionId: `RET-${Date.now().toString().slice(-6)}`,
+            createdAt: new Date().toISOString(),
+            _adminModified: Date.now()
+          });
+        }
 
         // 3. Recalculate studentsCount
         if (Array.isArray(draft.courses)) {
@@ -962,6 +1021,19 @@ export function AppProvider({ children }) {
           userId: 'usr-admin-1',
           textUz: `🔄 Talaba ${currentUser.name} (${currentUser.phone || ''}) "${courseTitle}" kursini adminga qaytardi. Kursga kirish yopildi.`,
           textRu: `🔄 Студент ${currentUser.name} (${currentUser.phone || ''}) вернул курс "${courseTitle}" администратору. Доступ закрыт.`,
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+
+        // 5. Send automated message to Chat with Admin
+        draft.messages = draft.messages || [];
+        draft.messages.push({
+          id: `msg-${Date.now()}`,
+          senderId: currentUser.id,
+          receiverId: 'usr-admin-1',
+          text: lang === 'ru'
+            ? `🔄 Я вернул(а) курс "${courseTitle}" администратору.`
+            : `🔄 Men "${courseTitle}" kursini adminga qaytardim.`,
           read: false,
           createdAt: new Date().toISOString()
         });

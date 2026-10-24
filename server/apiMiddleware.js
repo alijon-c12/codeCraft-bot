@@ -689,6 +689,9 @@ export function createApiMiddleware() {
         const deletedCourseIds = Array.from(
           new Set([...(db.deletedCourseIds || []), ...(incoming.deletedCourseIds || [])])
         );
+        const deletedEnrollmentIds = Array.from(
+          new Set([...(db.deletedEnrollmentIds || []), ...(incoming.deletedEnrollmentIds || [])])
+        );
         const deletedPaymentIds = Array.from(
           new Set([...(db.deletedPaymentIds || []), ...(incoming.deletedPaymentIds || [])])
         );
@@ -746,13 +749,15 @@ export function createApiMiddleware() {
           (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         );
 
-        // Smart merge enrollments (keep all active enrollments unless user's payment was cancelled)
+        // Smart merge enrollments (keep all active enrollments unless user's payment was cancelled/returned or enrollment deleted)
         const cancelledUserCourses = new Set(
-          mergedPayments.filter((p) => p.status === 'cancelled').map((p) => `${p.userId}:${p.courseId}`)
+          mergedPayments
+            .filter((p) => p.status === 'cancelled' || p.status === 'returned')
+            .map((p) => `${p.userId}:${p.courseId}`)
         );
         const enrMap = new Map();
         for (const e of [...(db.enrollments || []), ...(incoming.enrollments || [])]) {
-          if (e && e.id && !deletedCourseIds.includes(e.courseId)) {
+          if (e && e.id && !deletedEnrollmentIds.includes(e.id) && !deletedCourseIds.includes(e.courseId)) {
             if (!cancelledUserCourses.has(`${e.userId}:${e.courseId}`) && !cancelledUserCourses.has(`${e.userId}:all`)) {
               enrMap.set(`${e.userId}:${e.courseId}`, e);
             }
@@ -853,6 +858,7 @@ export function createApiMiddleware() {
           certificates: mergedCertificates,
           messages: mergedMessages,
           deletedCourseIds,
+          deletedEnrollmentIds,
           deletedPaymentIds,
           deletedUserIds,
           deletedNotificationIds,
