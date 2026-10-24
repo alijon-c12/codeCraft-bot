@@ -345,13 +345,25 @@ export function AppProvider({ children }) {
 
     // 3. Real-time Server-Sent Events (SSE) for multi-device & separate browser updates
     let eventSource = null;
+    let lastKnownMessagesCount = null;
+    let lastKnownMessagesVersion = null;
+
     if (typeof EventSource !== 'undefined') {
       try {
         eventSource = new EventSource('/api/realtime-stream');
         eventSource.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data);
-            if (msg.type === 'DB_SYNC' || msg.type === 'PAYMENT_REQUESTED') {
+            if (msg.type === 'NEW_CHAT_MESSAGE') {
+              if (Array.isArray(msg.messages)) {
+                applyCleanDb({ ...dbRef.current, messages: msg.messages });
+              } else if (msg.message) {
+                const prevMsgs = dbRef.current?.messages || [];
+                if (!prevMsgs.some((m) => m.id === msg.message.id)) {
+                  applyCleanDb({ ...dbRef.current, messages: [...prevMsgs, msg.message] });
+                }
+              }
+            } else if (msg.type === 'DB_SYNC' || msg.type === 'PAYMENT_REQUESTED') {
               if (msg.version && msg.version !== lastKnownVersion) {
                 lastKnownVersion = msg.version;
               }
@@ -367,25 +379,31 @@ export function AppProvider({ children }) {
       } catch {}
     }
 
-    // 4. Lightweight background version check fallback (every 1.5 seconds)
+    // 4. Lightweight background version check fallback (every 800ms for instant reactivity)
     const checkServerVersion = async () => {
       try {
         const res = await fetch('/api/version');
         if (res.ok) {
           const data = await res.json();
           if (data && data.version) {
-            if (lastKnownVersion !== null && data.version !== lastKnownVersion) {
-              lastKnownVersion = data.version;
+            const versionChanged = lastKnownVersion !== null && data.version !== lastKnownVersion;
+            const messagesChanged =
+              (lastKnownMessagesCount !== null && data.messagesCount !== lastKnownMessagesCount) ||
+              (lastKnownMessagesVersion !== null && data.messagesVersion && data.messagesVersion !== lastKnownMessagesVersion);
+
+            lastKnownVersion = data.version;
+            lastKnownMessagesCount = data.messagesCount;
+            lastKnownMessagesVersion = data.messagesVersion || 0;
+
+            if (versionChanged || messagesChanged) {
               fetchLatestServerState();
-            } else {
-              lastKnownVersion = data.version;
             }
           }
         }
       } catch {}
     };
 
-    const pollInterval = setInterval(checkServerVersion, 1500);
+    const pollInterval = setInterval(checkServerVersion, 800);
 
     // 5. Instantly check version when tab becomes active / focused
     const handleVisibilityOrFocus = () => {
@@ -2197,25 +2215,44 @@ export function AppProvider({ children }) {
     const cleanText = (text || '').trim();
     if (!cleanText) return false;
 
-    const recipient = db.users.find((u) => u.id === recipientId);
+    const recipient = (db.users || []).find((u) => u.id === recipientId);
     const msgId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const newMsg = {
+      id: msgId,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderRole: currentUser.role,
+      recipientId,
+      recipientName: recipient?.name || 'Foydalanuvchi',
+      text: cleanText,
+      createdAt: new Date().toISOString(),
+      read: false
+    };
 
+    // 1. Immediately apply locally with 0ms delay
     updateDb((draft) => {
       draft.messages = draft.messages || [];
-      draft.messages.push({
-        id: msgId,
-        senderId: currentUser.id,
-        senderName: currentUser.name,
-        senderRole: currentUser.role,
-        recipientId,
-        recipientName: recipient?.name || 'Foydalanuvchi',
-        text: cleanText,
-        createdAt: new Date().toISOString(),
-        read: false
-      });
-
+      if (!draft.messages.some((m) => m.id === msgId)) {
+        draft.messages.push(newMsg);
+      }
       return draft;
     });
+
+    // 2. Direct fast /api/chat/send for immediate multi-device sync
+    try {
+      fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMsg)
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.messages)) {
+            applyCleanDb({ ...dbRef.current, messages: data.messages });
+          }
+        })
+        .catch(() => {});
+    } catch {}
 
     showToast(lang === 'ru' ? 'Сообщение отправлено' : 'Xabar yuborildi', 'success');
     return true;

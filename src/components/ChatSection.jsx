@@ -107,6 +107,39 @@ export function ChatSection({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentPartnerId, db.messages?.length]);
 
+  // Real-time polling while ChatSection is mounted (checks for new messages every 800ms)
+  useEffect(() => {
+    let isCancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/chat/messages');
+        if (res.ok && !isCancelled) {
+          const data = await res.json();
+          if (data && Array.isArray(data.messages)) {
+            const currentIds = new Set((db.messages || []).map((m) => m.id));
+            const hasNew = data.messages.some((m) => !currentIds.has(m.id));
+            if (hasNew) {
+              if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('educenter_db_sync_bus');
+                channel.postMessage({
+                  type: 'DB_SYNC',
+                  timestamp: Date.now(),
+                  db: { ...db, messages: data.messages }
+                });
+                channel.close();
+              }
+            }
+          }
+        }
+      } catch {}
+    }, 800);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [db.messages]);
+
   const activePartner = isAdmin
     ? (db.users?.find((u) => u.id === currentPartnerId) || conversations.find((c) => c.id === currentPartnerId)?.user || {
         id: currentPartnerId,
@@ -174,14 +207,21 @@ export function ChatSection({
         borderRadius: '16px',
         border: '1px solid var(--border)',
         overflow: 'hidden',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)'
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box'
       }}
     >
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isAdmin ? '320px 1fr' : '1fr',
-          minHeight: '560px'
+          gridTemplateColumns: isAdmin ? 'minmax(250px, 300px) minmax(0, 1fr)' : 'minmax(0, 1fr)',
+          minHeight: '560px',
+          width: '100%',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
         }}
       >
         {/* LEFT PANEL: CONVERSATIONS LIST (ADMIN ONLY) */}
@@ -191,7 +231,9 @@ export function ChatSection({
               borderRight: '1px solid var(--border)',
               backgroundColor: 'var(--bg-alt)',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minWidth: 0,
+              overflow: 'hidden'
             }}
           >
             {/* INBOX SEARCH HEADER */}
@@ -327,7 +369,18 @@ export function ChatSection({
         )}
 
         {/* RIGHT PANEL: ACTIVE CHAT THREAD */}
-        <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'var(--surface)',
+            minWidth: 0,
+            width: '100%',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
+          }}
+        >
           {/* CHAT HEADER */}
           <div
             style={{
@@ -336,7 +389,10 @@ export function ChatSection({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: 'var(--bg-alt)'
+              backgroundColor: 'var(--bg-alt)',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -395,13 +451,17 @@ export function ChatSection({
           <div
             style={{
               flex: 1,
-              height: '380px',
+              height: '400px',
               overflowY: 'auto',
-              padding: '20px',
+              overflowX: 'hidden',
+              padding: '16px 20px',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              backgroundColor: 'var(--surface)'
+              backgroundColor: 'var(--surface)',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box'
             }}
           >
             {currentThread.length === 0 ? (
@@ -427,10 +487,12 @@ export function ChatSection({
                     key={msg.id}
                     style={{
                       alignSelf: isFromMe ? 'flex-end' : 'flex-start',
-                      maxWidth: '75%',
+                      maxWidth: '78%',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: isFromMe ? 'flex-end' : 'flex-start'
+                      alignItems: isFromMe ? 'flex-end' : 'flex-start',
+                      boxSizing: 'border-box',
+                      minWidth: 0
                     }}
                   >
                     <div
@@ -443,7 +505,10 @@ export function ChatSection({
                         fontSize: '0.94rem',
                         lineHeight: 1.45,
                         wordBreak: 'break-word',
-                        border: isFromMe ? 'none' : '1px solid var(--border)'
+                        overflowWrap: 'break-word',
+                        border: isFromMe ? 'none' : '1px solid var(--border)',
+                        maxWidth: '100%',
+                        boxSizing: 'border-box'
                       }}
                     >
                       {msg.text}
@@ -477,6 +542,9 @@ export function ChatSection({
               display: 'flex',
               gap: '8px',
               overflowX: 'auto',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               backgroundColor: 'var(--bg-alt)'
             }}
           >
@@ -510,7 +578,10 @@ export function ChatSection({
               borderTop: '1px solid var(--border)',
               display: 'flex',
               gap: '10px',
-              backgroundColor: 'var(--surface)'
+              backgroundColor: 'var(--surface)',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box'
             }}
           >
             <input
@@ -533,12 +604,13 @@ export function ChatSection({
                   handleSend();
                 }
               }}
+              style={{ flex: 1, minWidth: 0 }}
             />
             <button
               type="button"
               className="btn btn-primary"
               onClick={handleSend}
-              style={{ minWidth: '100px' }}
+              style={{ minWidth: '105px', flexShrink: 0 }}
             >
               {lang === 'ru' ? 'Отправить' : 'Yuborish'} ✈️
             </button>

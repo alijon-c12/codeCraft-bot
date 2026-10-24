@@ -3380,6 +3380,21 @@ video::-webkit-media-controls-remote-playback-button {
   visibility: hidden !important;
 }
 
+/* Responsive Chat Section constraints */
+.chat-container-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 860px) {
+  .chat-container-card > div {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
 
 
 

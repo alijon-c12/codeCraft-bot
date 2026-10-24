@@ -87,6 +87,7 @@ export function writeDb(data) {
 // Global SSE clients and DB version for instant multi-client reactivity
 const sseClients = (globalThis.__codeCraftSseClients = globalThis.__codeCraftSseClients || new Set());
 let currentDbVersion = (globalThis.__codeCraftDbVersion = globalThis.__codeCraftDbVersion || Date.now());
+let messagesVersion = (globalThis.__codeCraftMessagesVersion = globalThis.__codeCraftMessagesVersion || Date.now());
 
 export function notifyRealtimeClients(eventType = 'DB_SYNC', payload = {}) {
   currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
@@ -94,6 +95,7 @@ export function notifyRealtimeClients(eventType = 'DB_SYNC', payload = {}) {
   for (const client of sseClients) {
     try {
       client.write(`data: ${dataString}\n\n`);
+      if (typeof client.flush === 'function') client.flush();
     } catch {
       sseClients.delete(client);
     }
@@ -573,7 +575,9 @@ export function createApiMiddleware() {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
       });
-      res.write(`data: ${JSON.stringify({ type: 'CONNECTED', version: currentDbVersion, coursesCount: (db.courses || []).length })}\n\n`);
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      res.write(`data: ${JSON.stringify({ type: 'CONNECTED', version: currentDbVersion, messagesVersion, coursesCount: (db.courses || []).length })}\n\n`);
+      if (typeof res.flush === 'function') res.flush();
       sseClients.add(res);
 
       req.on('close', () => {
@@ -587,8 +591,52 @@ export function createApiMiddleware() {
       return sendJson(res, 200, {
         ok: true,
         version: currentDbVersion,
+        messagesVersion,
+        messagesCount: (db.messages || []).length,
         coursesCount: (db.courses || []).length,
         pendingPaymentsCount: (db.payments || []).filter((p) => p.status === 'pending').length
+      });
+    }
+
+    // 0.11. POST /api/chat/send — Instant lightweight chat message delivery
+    if (pathname === '/api/chat/send' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (body && body.text && body.senderId && body.recipientId) {
+        const curDb = readDb();
+        curDb.messages = curDb.messages || [];
+        const newMsg = {
+          id: body.id || `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          senderId: body.senderId,
+          senderName: body.senderName || 'Foydalanuvchi',
+          senderRole: body.senderRole || 'student',
+          recipientId: body.recipientId,
+          recipientName: body.recipientName || '',
+          text: String(body.text).trim(),
+          createdAt: body.createdAt || new Date().toISOString(),
+          read: false
+        };
+        // Smart merge or append
+        const exists = curDb.messages.some((m) => m.id === newMsg.id);
+        if (!exists) {
+          curDb.messages.push(newMsg);
+        }
+        messagesVersion = globalThis.__codeCraftMessagesVersion = Date.now();
+        currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
+        writeDb(curDb);
+        notifyRealtimeClients('NEW_CHAT_MESSAGE', { message: newMsg, messages: curDb.messages, messagesVersion });
+        return sendJson(res, 200, { ok: true, message: newMsg, messages: curDb.messages, messagesVersion });
+      }
+      return sendJson(res, 400, { error: 'Invalid chat message payload' });
+    }
+
+    // 0.12. GET /api/chat/messages — Fast chat messages fetch
+    if (pathname === '/api/chat/messages' && req.method === 'GET') {
+      const curDb = readDb();
+      return sendJson(res, 200, {
+        ok: true,
+        messages: curDb.messages || [],
+        messagesVersion,
+        version: currentDbVersion
       });
     }
 
