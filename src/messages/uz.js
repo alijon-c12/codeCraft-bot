@@ -212,7 +212,7 @@ export const uz = {
     title: "Talaba shaxsiy kabineti",
     tabs: {
       myCourses: "Mening kurslarim",
-      chat: "Admin bilan Chat",
+      chat: "Chatlar",
       submissions: "Uy vazifalarim",
       certificates: "Sertifikatlarim",
       payments: "To'lovlar tarixi",
@@ -250,6 +250,7 @@ export const uz = {
     tabs: {
       overview: "Dashboard & Statistika",
       purchaseRequests: "Kurs sotib olmoqchi bo'lganlar",
+      chats: "Chatlar",
       courses: "Kurslar boshqaruvi",
       users: "Foydalanuvchilar va Boshqaruv",
       homework: "Uy vazifalari",

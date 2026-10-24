@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { getVideoUrl } from '../utils/mediaStorage.js';
+import { ChatSection } from '../components/ChatSection.jsx';
 
 export function StudentDashboardPage() {
   const {
@@ -193,158 +194,16 @@ export function StudentDashboardPage() {
           })}
         </div>
 
-        {/* 0. CHAT WITH ADMIN */}
+        {/* 0. CHATLAR BO'LIMI */}
         {activeTab === 'chat' && (
           <div className="tab-panel">
-            {(() => {
-              const adminUser =
-                db.users.find((u) => (u.phone || '').replace(/\D/g, '') === '998951639101') ||
-                db.users.find((u) => u.role === 'admin') ||
-                { id: 'usr-admin-1', name: 'Alibek Abdunabiyev (Bosh Admin)', phone: '+998 95 163 91 01' };
-
-              const chatThread = (db.messages || [])
-                .filter(
-                  (m) =>
-                    (m.senderId === currentUser.id && m.recipientId === adminUser.id) ||
-                    (m.senderId === adminUser.id && m.recipientId === currentUser.id)
-                )
-                .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-              function handleSendToAdmin() {
-                if (!studentChatText.trim()) return;
-                sendChatMessage({ recipientId: adminUser.id, text: studentChatText });
-                setStudentChatText('');
-              }
-
-              return (
-                <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                  {/* CHAT HEADER */}
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-alt)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ position: 'relative' }}>
-                        <img
-                          src={adminUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                          alt="Admin"
-                          style={{ width: '46px', height: '46px', borderRadius: '50%', objectFit: 'cover' }}
-                        />
-                        <span style={{ position: 'absolute', bottom: -2, right: -2, fontSize: '12px' }}>🛡️</span>
-                      </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>{adminUser.name}</span>
-                          <span className="role-badge" style={{ background: 'linear-gradient(135deg, #ff5722, #f59e0b)', color: '#fff', fontSize: '0.72rem' }}>
-                            BOSH ADMIN
-                          </span>
-                        </h3>
-                        <small className="text-muted">
-                          CodeCraft Bosh Ma'muriyati • Tel: {adminUser.phone} • Doimiy onlayn qo'llab-quvvatlash
-                        </small>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="status-pill paid" style={{ fontSize: '0.78rem' }}>🟢 Aloqada</span>
-                    </div>
-                  </div>
-
-                  {/* CHAT MESSAGES BODY */}
-                  <div style={{ height: '380px', overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--surface)' }}>
-                    {chatThread.length === 0 ? (
-                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        <span style={{ fontSize: '2.5rem' }}>💬</span>
-                        <p style={{ marginTop: '8px' }}>
-                          Administratorga xabar yuboring. Kurslar, darslar yoki to'lovlar bo'yicha savollaringizga tezda javob beriladi.
-                        </p>
-                      </div>
-                    ) : (
-                      chatThread.map((msg) => {
-                        const isFromMe = msg.senderId === currentUser.id;
-                        return (
-                          <div
-                            key={msg.id}
-                            style={{
-                              alignSelf: isFromMe ? 'flex-end' : 'flex-start',
-                              maxWidth: '75%',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: isFromMe ? 'flex-end' : 'flex-start'
-                            }}
-                          >
-                            <div
-                              style={{
-                                padding: '10px 16px',
-                                borderRadius: isFromMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                                backgroundColor: isFromMe ? 'var(--primary)' : 'var(--bg-alt)',
-                                color: isFromMe ? '#ffffff' : 'var(--text)',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                                fontSize: '0.94rem',
-                                lineHeight: 1.45,
-                                wordBreak: 'break-word',
-                                border: isFromMe ? 'none' : '1px solid var(--border)'
-                              }}
-                            >
-                              {msg.text}
-                            </div>
-                            <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', padding: '0 4px' }}>
-                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {isFromMe && ' • ✓✓'}
-                            </small>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* QUICK QUESTIONS CHIPS */}
-                  <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', overflowX: 'auto', backgroundColor: 'var(--bg-alt)' }}>
-                    {[
-                      "Assalomu alaykum ustoz!",
-                      "Mening uy vazifam tekshirildimi?",
-                      "Sertifikat olish uchun nechchi ball kerak?",
-                      "Keyingi modul qachon ochiladi?",
-                      "Yangi kursga qanday yozilsam bo'ladi?"
-                    ].map((chip, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="btn btn-xs btn-ghost"
-                        onClick={() => {
-                          sendChatMessage({ recipientId: adminUser.id, text: chip });
-                        }}
-                        style={{ whiteSpace: 'nowrap', fontSize: '0.78rem', border: '1px solid var(--border)', borderRadius: '99px', backgroundColor: 'var(--surface)' }}
-                      >
-                        {chip}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* CHAT INPUT BAR */}
-                  <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px', backgroundColor: 'var(--surface)' }}>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Bosh administratorga xabaringizni yozing..."
-                      value={studentChatText}
-                      onChange={(e) => setStudentChatText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSendToAdmin();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleSendToAdmin}
-                      style={{ minWidth: '100px' }}
-                    >
-                      Yuborish ✈️
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
+            <ChatSection
+              db={db}
+              currentUser={currentUser}
+              sendChatMessage={sendChatMessage}
+              markChatRead={markChatRead}
+              lang={lang}
+            />
           </div>
         )}
 

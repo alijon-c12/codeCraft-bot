@@ -142,6 +142,39 @@ function sanitizeDb(data) {
   if (!Array.isArray(clone.payments)) {
     clone.payments = [];
   }
+  if (Array.isArray(clone.deletedPaymentIds) && clone.deletedPaymentIds.length > 0) {
+    clone.payments = clone.payments.filter((p) => !clone.deletedPaymentIds.includes(p.id));
+  }
+  if (Array.isArray(clone.deletedCertificateIds) && clone.deletedCertificateIds.length > 0 && Array.isArray(clone.certificates)) {
+    clone.certificates = clone.certificates.filter((c) => !clone.deletedCertificateIds.includes(c.id));
+  }
+  if (Array.isArray(clone.notifications)) {
+    const deletedNotifSet = new Set(clone.deletedNotificationIds || []);
+    const deduped = [];
+    const normText = (str) => String(str || '').replace(/EC-2026-[A-Z0-9]+/g, 'EC-2026');
+    for (const n of clone.notifications) {
+      if (!n || !n.id || deletedNotifSet.has(n.id)) continue;
+      // Chat messages belong to Chatlar, not Bildirishnomalar
+      if (String(n.textUz || '').startsWith('💬') || String(n.textRu || '').startsWith('💬')) {
+        deletedNotifSet.add(n.id);
+        continue;
+      }
+      const nTime = new Date(n.createdAt || 0).getTime();
+      const isDup = deduped.some(
+        (existing) =>
+          existing.userId === n.userId &&
+          normText(existing.textUz) === normText(n.textUz) &&
+          Math.abs(new Date(existing.createdAt || 0).getTime() - nTime) < 3000
+      );
+      if (!isDup) {
+        deduped.push(n);
+      } else {
+        deletedNotifSet.add(n.id);
+      }
+    }
+    clone.notifications = deduped;
+    clone.deletedNotificationIds = Array.from(deletedNotifSet);
+  }
   return clone;
 }
 
@@ -206,6 +239,39 @@ export function AppProvider({ children }) {
     }, 4000);
   }
 
+  const activeSyncsRef = useRef(0);
+  const dbRef = useRef(db);
+  dbRef.current = db;
+
+  function applyCleanDb(rawDb) {
+    const prev = dbRef.current;
+    const mergedRaw = {
+      ...rawDb,
+      deletedCourseIds: Array.from(
+        new Set([...(prev?.deletedCourseIds || []), ...(rawDb?.deletedCourseIds || [])])
+      ),
+      deletedPaymentIds: Array.from(
+        new Set([...(prev?.deletedPaymentIds || []), ...(rawDb?.deletedPaymentIds || [])])
+      ),
+      deletedUserIds: Array.from(
+        new Set([...(prev?.deletedUserIds || []), ...(rawDb?.deletedUserIds || [])])
+      ),
+      deletedNotificationIds: Array.from(
+        new Set([...(prev?.deletedNotificationIds || []), ...(rawDb?.deletedNotificationIds || [])])
+      ),
+      deletedCertificateIds: Array.from(
+        new Set([...(prev?.deletedCertificateIds || []), ...(rawDb?.deletedCertificateIds || [])])
+      )
+    };
+    const clean = sanitizeDb(mergedRaw);
+    dbRef.current = clean;
+    setDb(clean);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    } catch {}
+    return clean;
+  }
+
   // Real-time synchronization across browser tabs (BroadcastChannel + Storage)
   // and across devices / clients (Server-Sent Events + smart polling)
   useEffect(() => {
@@ -213,18 +279,14 @@ export function AppProvider({ children }) {
     let isFetching = false;
 
     const fetchLatestServerState = async () => {
-      if (isFetching) return;
+      if (isFetching || activeSyncsRef.current > 0) return;
       isFetching = true;
       try {
         const r = await fetch('/api/state');
-        if (r.ok) {
+        if (r.ok && activeSyncsRef.current === 0) {
           const serverData = await r.json();
           if (serverData && Array.isArray(serverData.courses)) {
-            const clean = sanitizeDb(serverData);
-            setDb(clean);
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-            } catch {}
+            applyCleanDb(serverData);
           }
         }
       } catch {
@@ -244,11 +306,7 @@ export function AppProvider({ children }) {
         bc = new BroadcastChannel(DB_SYNC_CHANNEL_NAME);
         bc.onmessage = (event) => {
           if (event?.data?.type === 'DB_SYNC' && event.data.db) {
-            const clean = sanitizeDb(event.data.db);
-            setDb(clean);
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-            } catch {}
+            applyCleanDb(event.data.db);
           }
         };
       } catch {}
@@ -259,7 +317,7 @@ export function AppProvider({ children }) {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          setDb(sanitizeDb(parsed));
+          applyCleanDb(parsed);
         } catch {}
       }
     };
@@ -334,55 +392,50 @@ export function AppProvider({ children }) {
 
   // Persist DB changes to localStorage, BroadcastChannel, and Node backend (/api/sync)
   function updateDb(updater, auditInfo = null) {
-    setDb((prev) => {
-      const next = typeof updater === 'function' ? updater(structuredClone(prev)) : updater;
-      if (Array.isArray(next.courses)) {
-        next.courses.forEach((c) => {
-          c.studentsCount = (next.enrollments || []).filter((e) => e.courseId === c.id).length;
-        });
-      }
-      if (auditInfo && currentUser) {
-        next.auditLogs = [
-          {
-            id: `aud-${Date.now()}`,
-            userId: currentUser.id,
-            userName: currentUser.name,
-            action: auditInfo.action,
-            details: auditInfo.details,
-            createdAt: new Date().toISOString()
-          },
-          ...(next.auditLogs || [])
-        ];
-      }
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // ignore
-      }
+    const prev = dbRef.current;
+    const rawNext = typeof updater === 'function' ? updater(structuredClone(prev)) : updater;
+    if (Array.isArray(rawNext.courses)) {
+      rawNext.courses.forEach((c) => {
+        c.studentsCount = (rawNext.enrollments || []).filter((e) => e.courseId === c.id).length;
+      });
+    }
+    if (auditInfo && currentUser) {
+      rawNext.auditLogs = [
+        {
+          id: `aud-${Date.now()}`,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          action: auditInfo.action,
+          details: auditInfo.details,
+          createdAt: new Date().toISOString()
+        },
+        ...(rawNext.auditLogs || [])
+      ];
+    }
 
-      // Instant 0ms broadcast to all other open tabs in the same browser
-      broadcastLocalDbChange(next);
+    const next = applyCleanDb(rawNext);
 
-      // Persist to backend server and apply merged state if returned
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ db: next })
+    // Instant 0ms broadcast to all other open tabs in the same browser
+    broadcastLocalDbChange(next);
+
+    // Persist to backend server and apply merged state if returned
+    activeSyncsRef.current += 1;
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ db: next })
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((resData) => {
+        if (resData && resData.db && Array.isArray(resData.db.courses)) {
+          const merged = applyCleanDb(resData.db);
+          broadcastLocalDbChange(merged);
+        }
       })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((resData) => {
-          if (resData && resData.db && Array.isArray(resData.db.courses)) {
-            const merged = sanitizeDb(resData.db);
-            setDb(merged);
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-            } catch {}
-            broadcastLocalDbChange(merged);
-          }
-        })
-        .catch(() => {});
-      return next;
-    });
+      .catch(() => {})
+      .finally(() => {
+        activeSyncsRef.current = Math.max(0, activeSyncsRef.current - 1);
+      });
   }
 
   function setLang(nextLang) {
@@ -963,8 +1016,14 @@ export function AppProvider({ children }) {
     if (!certificateId) return;
     updateDb(
       (draft) => {
+        const removedCertIds = (draft.certificates || [])
+          .filter((c) => c.id === certificateId || c.code === certificateId)
+          .map((c) => c.id);
         draft.certificates = (draft.certificates || []).filter(
           (c) => c.id !== certificateId && c.code !== certificateId
+        );
+        draft.deletedCertificateIds = Array.from(
+          new Set([...(draft.deletedCertificateIds || []), certificateId, ...removedCertIds])
         );
         return draft;
       },
@@ -1459,8 +1518,26 @@ export function AppProvider({ children }) {
   function deleteNotification(notificationId) {
     if (!currentUser) return;
     updateDb((draft) => {
-      draft.notifications = (draft.notifications || []).filter(
-        (n) => n.id !== notificationId
+      const target = (draft.notifications || []).find((n) => n.id === notificationId);
+      const normText = (str) => String(str || '').replace(/EC-2026-[A-Z0-9]+/g, 'EC-2026');
+      const targetTime = target ? new Date(target.createdAt || 0).getTime() : 0;
+      const removedIds = [notificationId];
+
+      draft.notifications = (draft.notifications || []).filter((n) => {
+        if (n.id === notificationId) return false;
+        if (
+          target &&
+          n.userId === target.userId &&
+          normText(n.textUz) === normText(target.textUz) &&
+          Math.abs(new Date(n.createdAt || 0).getTime() - targetTime) < 3000
+        ) {
+          removedIds.push(n.id);
+          return false;
+        }
+        return true;
+      });
+      draft.deletedNotificationIds = Array.from(
+        new Set([...(draft.deletedNotificationIds || []), ...removedIds.filter(Boolean)])
       );
       return draft;
     });
@@ -1475,8 +1552,14 @@ export function AppProvider({ children }) {
   function clearAllNotifications() {
     if (!currentUser) return;
     updateDb((draft) => {
+      const removedIds = (draft.notifications || [])
+        .filter((n) => n.userId === currentUser.id)
+        .map((n) => n.id);
       draft.notifications = (draft.notifications || []).filter(
         (n) => n.userId !== currentUser.id
+      );
+      draft.deletedNotificationIds = Array.from(
+        new Set([...(draft.deletedNotificationIds || []), ...removedIds])
       );
       return draft;
     });
@@ -1973,20 +2056,6 @@ export function AppProvider({ children }) {
         text: cleanText,
         createdAt: new Date().toISOString(),
         read: false
-      });
-
-      draft.notifications = draft.notifications || [];
-      draft.notifications.unshift({
-        id: `notif-${Date.now()}`,
-        userId: recipientId,
-        textUz: currentUser.role === 'admin'
-          ? `💬 Bosh Administrator (${currentUser.name}): "${cleanText.slice(0, 45)}${cleanText.length > 45 ? '...' : ''}"`
-          : `💬 ${currentUser.name}: "${cleanText.slice(0, 45)}${cleanText.length > 45 ? '...' : ''}"`,
-        textRu: currentUser.role === 'admin'
-          ? `💬 Главный Администратор (${currentUser.name}): "${cleanText.slice(0, 45)}${cleanText.length > 45 ? '...' : ''}"`
-          : `💬 ${currentUser.name}: "${cleanText.slice(0, 45)}${cleanText.length > 45 ? '...' : ''}"`,
-        read: false,
-        createdAt: new Date().toISOString()
       });
 
       return draft;

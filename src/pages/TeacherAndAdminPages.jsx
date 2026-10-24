@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import { saveVideoFile } from '../utils/mediaStorage.js';
+import { ChatSection } from '../components/ChatSection.jsx';
 
 export function TeacherPanelPage() {
   const {
@@ -550,6 +551,8 @@ export function AdminPanelPage() {
     adminDeletePayment,
     gradeSubmission,
     adminAssignHomework,
+    sendChatMessage,
+    markChatRead,
     showToast,
     lang,
     navigate,
@@ -662,6 +665,8 @@ export function AdminPanelPage() {
         <div className="tabs-bar">
           {Object.entries(t.adminPanel.tabs).map(([key, label]) => {
             const isPurchaseTab = key === 'purchaseRequests';
+            const isChatTab = key === 'chats';
+            const unreadChatCount = (db.messages || []).filter((m) => m.recipientId === currentUser?.id && !m.read).length;
             return (
               <button
                 key={key}
@@ -670,6 +675,7 @@ export function AdminPanelPage() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
               >
                 {isPurchaseTab && <span>🛒</span>}
+                {isChatTab && <span>💬</span>}
                 <span>{label}</span>
                 {isPurchaseTab && pendingPayments.length > 0 && (
                   <span
@@ -686,10 +692,38 @@ export function AdminPanelPage() {
                     {pendingPayments.length}
                   </span>
                 )}
+                {isChatTab && unreadChatCount > 0 && (
+                  <span
+                    style={{
+                      background: '#ff5722',
+                      color: '#fff',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      boxShadow: '0 0 10px rgba(255, 87, 34, 0.6)'
+                    }}
+                  >
+                    {unreadChatCount}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
+
+        {/* CHATLAR (O'QUVCHILAR BILAN SHAXSIY CHAT) */}
+        {activeTab === 'chats' && (
+          <div className="tab-panel">
+            <ChatSection
+              db={db}
+              currentUser={currentUser}
+              sendChatMessage={sendChatMessage}
+              markChatRead={markChatRead}
+              lang={lang}
+            />
+          </div>
+        )}
 
         {/* KURS SOTIB OLMOQCHI BO'LGANLAR (CHEK YUBORGAN O'QUVCHILARNI TASDIQLASH BO'LIMI) */}
         {activeTab === 'purchaseRequests' && (

@@ -212,7 +212,7 @@ export const ru = {
     title: "Личный кабинет студента",
     tabs: {
       myCourses: "Мои курсы",
-      chat: "Чат с Администратором",
+      chat: "Чаты",
       submissions: "Домашние задания",
       certificates: "Мои сертификаты",
       payments: "История платежей",
@@ -250,6 +250,7 @@ export const ru = {
     tabs: {
       overview: "Дашборд и Статистика",
       purchaseRequests: "Желающие купить курс",
+      chats: "Чаты",
       courses: "Управление курсами",
       users: "Пользователи и Управление",
       homework: "Домашние задания",

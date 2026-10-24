@@ -695,6 +695,12 @@ export function createApiMiddleware() {
         const deletedUserIds = Array.from(
           new Set([...(db.deletedUserIds || []), ...(incoming.deletedUserIds || [])])
         );
+        const deletedNotificationIds = Array.from(
+          new Set([...(db.deletedNotificationIds || []), ...(incoming.deletedNotificationIds || [])])
+        );
+        const deletedCertificateIds = Array.from(
+          new Set([...(db.deletedCertificateIds || []), ...(incoming.deletedCertificateIds || [])])
+        );
 
         // Smart merge users (preserve users registered across different browsers)
         const existingPasswords = new Map((db.users || []).map((u) => [u.id, u.passwordHash]));
@@ -781,17 +787,46 @@ export function createApiMiddleware() {
         }
         const mergedLessons = Array.from(lesMap.values());
 
-        // Smart merge notifications
+        // Smart merge notifications (respecting deletedNotificationIds, deduplicating, and excluding chat notifications)
         const notifMap = new Map();
+        const normNotifText = (str) => String(str || '').replace(/EC-2026-[A-Z0-9]+/g, 'EC-2026');
         for (const n of [...(incoming.notifications || []), ...(db.notifications || [])]) {
-          if (n && n.id) {
+          if (n && n.id && !deletedNotificationIds.includes(n.id)) {
+            if (String(n.textUz || '').startsWith('💬') || String(n.textRu || '').startsWith('💬')) {
+              deletedNotificationIds.push(n.id);
+              continue;
+            }
             const prev = notifMap.get(n.id);
             notifMap.set(n.id, prev ? { ...prev, ...n, read: Boolean(prev.read || n.read) } : n);
           }
         }
-        const mergedNotifications = Array.from(notifMap.values()).sort(
+        const sortedNotifs = Array.from(notifMap.values()).sort(
           (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         );
+        const mergedNotifications = [];
+        for (const n of sortedNotifs) {
+          const nTime = new Date(n.createdAt || 0).getTime();
+          const isDup = mergedNotifications.some(
+            (existing) =>
+              existing.userId === n.userId &&
+              normNotifText(existing.textUz) === normNotifText(n.textUz) &&
+              Math.abs(new Date(existing.createdAt || 0).getTime() - nTime) < 3000
+          );
+          if (!isDup) {
+            mergedNotifications.push(n);
+          } else if (!deletedNotificationIds.includes(n.id)) {
+            deletedNotificationIds.push(n.id);
+          }
+        }
+
+        // Smart merge certificates (respecting deletedCertificateIds)
+        const certMap = new Map();
+        for (const c of [...(db.certificates || []), ...(incoming.certificates || [])]) {
+          if (c && c.id && !deletedCertificateIds.includes(c.id) && !deletedCertificateIds.includes(c.code)) {
+            certMap.set(c.id, { ...certMap.get(c.id), ...c });
+          }
+        }
+        const mergedCertificates = Array.from(certMap.values());
 
         const nextDb = {
           ...db,
@@ -803,9 +838,12 @@ export function createApiMiddleware() {
           modules: mergedModules,
           lessons: mergedLessons,
           notifications: mergedNotifications,
+          certificates: mergedCertificates,
           deletedCourseIds,
           deletedPaymentIds,
-          deletedUserIds
+          deletedUserIds,
+          deletedNotificationIds,
+          deletedCertificateIds
         };
         writeDb(nextDb);
         const safeUsers = nextDb.users.map(({ passwordHash: _passwordHash, ...u }) => u);
