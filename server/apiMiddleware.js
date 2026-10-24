@@ -78,9 +78,40 @@ export function readDb() {
 export function writeDb(data) {
   try {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+    notifyRealtimeClients('DB_SYNC', { coursesCount: (data.courses || []).length });
   } catch (err) {
     console.error('Failed to persist db.json:', err);
   }
+}
+
+// Global SSE clients and DB version for instant multi-client reactivity
+const sseClients = (globalThis.__codeCraftSseClients = globalThis.__codeCraftSseClients || new Set());
+let currentDbVersion = (globalThis.__codeCraftDbVersion = globalThis.__codeCraftDbVersion || Date.now());
+
+export function notifyRealtimeClients(eventType = 'DB_SYNC', payload = {}) {
+  currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
+  const dataString = JSON.stringify({ type: eventType, version: currentDbVersion, ...payload });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${dataString}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// Periodic keep-alive heartbeat to prevent reverse proxy/hosting timeouts on SSE
+if (!globalThis.__codeCraftSseHeartbeatStarted) {
+  globalThis.__codeCraftSseHeartbeatStarted = true;
+  setInterval(() => {
+    for (const client of sseClients) {
+      try {
+        client.write(': heartbeat\n\n');
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }, 25000);
 }
 
 function parseJsonBody(req) {
@@ -533,6 +564,32 @@ export function createApiMiddleware() {
     const authUser = verifyToken(token);
 
     const db = readDb();
+
+    // 0. GET /api/realtime-stream — Server-Sent Events (SSE) for instant cross-device updates without refreshing
+    if (pathname === '/api/realtime-stream' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.write(`data: ${JSON.stringify({ type: 'CONNECTED', version: currentDbVersion, coursesCount: (db.courses || []).length })}\n\n`);
+      sseClients.add(res);
+
+      req.on('close', () => {
+        sseClients.delete(res);
+      });
+      return;
+    }
+
+    // 0.1. GET /api/version — Lightweight version check for smart background polling
+    if (pathname === '/api/version' && req.method === 'GET') {
+      return sendJson(res, 200, {
+        ok: true,
+        version: currentDbVersion,
+        coursesCount: (db.courses || []).length
+      });
+    }
 
     // 1. GET /api/state — Fetch complete application state
     if (pathname === '/api/state' && req.method === 'GET') {

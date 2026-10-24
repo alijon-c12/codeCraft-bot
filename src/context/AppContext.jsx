@@ -122,6 +122,23 @@ const STORAGE_KEY = 'educenter_db_v16';
 const USER_STORAGE_KEY = 'educenter_current_user_v4';
 const LANG_STORAGE_KEY = 'educenter_lang_v1';
 const THEME_STORAGE_KEY = 'educenter_theme_v1';
+const DB_SYNC_CHANNEL_NAME = 'codecraft_db_realtime_sync';
+
+function broadcastLocalDbChange(updatedDb) {
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel(DB_SYNC_CHANNEL_NAME);
+      channel.postMessage({
+        type: 'DB_SYNC',
+        timestamp: Date.now(),
+        db: updatedDb
+      });
+      channel.close();
+    }
+  } catch {
+    // ignore
+  }
+}
 
 function sanitizeDb(data) {
   if (!data) return structuredClone(initialDatabase);
@@ -214,23 +231,133 @@ export function AppProvider({ children }) {
     }, 4000);
   }
 
-  // Sync initial state from Node.js backend API (/api/state) if running
+  // Real-time synchronization across browser tabs (BroadcastChannel + Storage)
+  // and across devices / clients (Server-Sent Events + smart polling)
   useEffect(() => {
-    fetch('/api/state')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((serverData) => {
-        if (serverData && serverData.courses && serverData.courses.length > 0) {
-          const clean = sanitizeDb(serverData);
-          setDb(clean);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    let lastKnownVersion = null;
+    let isFetching = false;
+
+    const fetchLatestServerState = async () => {
+      if (isFetching) return;
+      isFetching = true;
+      try {
+        const r = await fetch('/api/state');
+        if (r.ok) {
+          const serverData = await r.json();
+          if (serverData && Array.isArray(serverData.courses)) {
+            const clean = sanitizeDb(serverData);
+            setDb(clean);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            } catch {}
+          }
         }
-      })
-      .catch(() => {
-        // Offline or static mode fallback
-      });
+      } catch {
+        // Offline or network error
+      } finally {
+        isFetching = false;
+      }
+    };
+
+    // Initial state load from backend
+    fetchLatestServerState();
+
+    // 1. Cross-Tab Instant Sync via BroadcastChannel (0ms latency, same browser)
+    let bc = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel(DB_SYNC_CHANNEL_NAME);
+        bc.onmessage = (event) => {
+          if (event?.data?.type === 'DB_SYNC' && event.data.db) {
+            const clean = sanitizeDb(event.data.db);
+            setDb(clean);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            } catch {}
+          }
+        };
+      } catch {}
+    }
+
+    // 2. Cross-Tab Sync via standard 'storage' event fallback
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setDb(sanitizeDb(parsed));
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // 3. Real-time Server-Sent Events (SSE) for multi-device & separate browser updates
+    let eventSource = null;
+    if (typeof EventSource !== 'undefined') {
+      try {
+        eventSource = new EventSource('/api/realtime-stream');
+        eventSource.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'DB_SYNC') {
+              if (msg.version && msg.version !== lastKnownVersion) {
+                lastKnownVersion = msg.version;
+                fetchLatestServerState();
+              }
+            } else if (msg.type === 'CONNECTED' && msg.version) {
+              lastKnownVersion = msg.version;
+            }
+          } catch {}
+        };
+        eventSource.onerror = () => {
+          // SSE auto-reconnects
+        };
+      } catch {}
+    }
+
+    // 4. Lightweight background version check fallback (every 3.5 seconds)
+    const checkServerVersion = async () => {
+      try {
+        const res = await fetch('/api/version');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.version) {
+            if (lastKnownVersion !== null && data.version !== lastKnownVersion) {
+              lastKnownVersion = data.version;
+              fetchLatestServerState();
+            } else {
+              lastKnownVersion = data.version;
+            }
+          }
+        }
+      } catch {}
+    };
+
+    const pollInterval = setInterval(checkServerVersion, 3500);
+
+    // 5. Instantly check version when tab becomes active / focused
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        checkServerVersion();
+      }
+    };
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      if (bc) {
+        try { bc.close(); } catch {}
+      }
+      window.removeEventListener('storage', handleStorageChange);
+      if (eventSource) {
+        try { eventSource.close(); } catch {}
+      }
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, []);
 
-  // Persist DB changes to localStorage and Node backend (/api/sync)
+  // Persist DB changes to localStorage, BroadcastChannel, and Node backend (/api/sync)
   function updateDb(updater, auditInfo = null) {
     setDb((prev) => {
       const next = typeof updater === 'function' ? updater(structuredClone(prev)) : updater;
@@ -257,6 +384,11 @@ export function AppProvider({ children }) {
       } catch {
         // ignore
       }
+
+      // Instant 0ms broadcast to all other open tabs in the same browser
+      broadcastLocalDbChange(next);
+
+      // Persist to backend server
       fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
