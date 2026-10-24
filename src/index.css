@@ -3365,5 +3365,21 @@ textarea {
   }
 }
 
+/* Suppress Picture-in-Picture & Opera video pop-out overlay buttons */
+video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+video::-webkit-media-controls-remote-playback-button {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+
 
 

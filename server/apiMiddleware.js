@@ -828,6 +828,18 @@ export function createApiMiddleware() {
         }
         const mergedCertificates = Array.from(certMap.values());
 
+        // Smart merge messages (preserve all messages between students and admin across devices)
+        const msgMap = new Map();
+        for (const m of [...(db.messages || []), ...(incoming.messages || [])]) {
+          if (m && m.id) {
+            const existing = msgMap.get(m.id);
+            msgMap.set(m.id, existing ? { ...existing, ...m, read: Boolean(existing.read || m.read) } : m);
+          }
+        }
+        const mergedMessages = Array.from(msgMap.values()).sort(
+          (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+        );
+
         const nextDb = {
           ...db,
           ...incoming,
@@ -839,6 +851,7 @@ export function createApiMiddleware() {
           lessons: mergedLessons,
           notifications: mergedNotifications,
           certificates: mergedCertificates,
+          messages: mergedMessages,
           deletedCourseIds,
           deletedPaymentIds,
           deletedUserIds,

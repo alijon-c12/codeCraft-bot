@@ -22,6 +22,7 @@ export function StudentDashboardPage() {
     submitAssignment,
     sendChatMessage,
     markChatRead,
+    returnCourseToAdmin,
     lang
   } = useApp();
 
@@ -250,6 +251,27 @@ export function StudentDashboardPage() {
                               🎓 {t.dashboard.downloadCert}
                             </button>
                           )}
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => {
+                              const msg = lang === 'ru'
+                                ? 'Вы действительно хотите вернуть этот курс администратору? Доступ к материалам будет закрыт.'
+                                : "Haqiqatan ham bu kursni adminga qaytarmoqchimisiz? Kurs materiallariga kirish yopiladi.";
+                              if (window.confirm(msg)) {
+                                returnCourseToAdmin(course.id);
+                              }
+                            }}
+                            style={{
+                              borderColor: 'rgba(239, 68, 68, 0.45)',
+                              color: '#ef4444',
+                              background: 'rgba(239, 68, 68, 0.05)',
+                              fontWeight: 600
+                            }}
+                            title={lang === 'ru' ? 'Вернуть курс администратору' : 'Kursni adminga qaytarish'}
+                          >
+                            🔄 {lang === 'ru' ? 'Вернуть курс' : 'Kursni qaytarish'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -935,6 +957,8 @@ export function LearningPage() {
                   key={currentVideoUrl}
                   controls
                   playsInline
+                  disablePictureInPicture
+                  disableRemotePlayback
                   controlsList="nodownload"
                   poster={course.thumbnail}
                   src={currentVideoUrl}
@@ -1027,6 +1051,7 @@ export function MyCoursesPage() {
     navigate,
     getCourseProgress,
     setActiveCertificate,
+    returnCourseToAdmin,
     lang
   } = useApp();
 
@@ -1246,7 +1271,7 @@ export function MyCoursesPage() {
                       )}
                     </div>
 
-                    <div className="enrolled-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <div className="enrolled-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <button
                         type="button"
                         className="btn btn-primary btn-sm btn-block"
@@ -1260,11 +1285,32 @@ export function MyCoursesPage() {
                           type="button"
                           className="btn btn-outline btn-sm btn-block"
                           onClick={() => setActiveCertificate(cert)}
-                          style={{ marginTop: '6px' }}
                         >
                           🎓 {lang === 'ru' ? 'Сертификат' : 'Sertifikatni yuklab olish'}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm btn-block"
+                        onClick={() => {
+                          const msg = lang === 'ru'
+                            ? 'Вы действительно хотите вернуть этот курс администратору? Доступ к урокам будет закрыт.'
+                            : "Haqiqatan ham ushbu kursni adminga qaytarmoqchimisiz? Kurs darslariga kirish to'xtatiladi.";
+                          if (window.confirm(msg)) {
+                            returnCourseToAdmin(course.id);
+                          }
+                        }}
+                        style={{
+                          borderColor: 'rgba(239, 68, 68, 0.45)',
+                          color: '#ef4444',
+                          background: 'rgba(239, 68, 68, 0.05)',
+                          fontWeight: 600,
+                          padding: '8px 14px'
+                        }}
+                        title={lang === 'ru' ? 'Вернуть курс администратору' : 'Kursni adminga qaytarish'}
+                      >
+                        🔄 {lang === 'ru' ? 'Вернуть курс администратору' : 'Kursni adminga qaytarish'}
+                      </button>
                     </div>
                   </div>
                 </div>

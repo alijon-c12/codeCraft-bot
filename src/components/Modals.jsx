@@ -544,6 +544,9 @@ export function GlobalModals() {
                 <video
                   controls
                   playsInline
+                  disablePictureInPicture
+                  disableRemotePlayback
+                  controlsList="nodownload"
                   src={modalVideoUrl}
                   style={{ width: '100%', maxHeight: '360px', display: 'block' }}
                 />

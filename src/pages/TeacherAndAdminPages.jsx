@@ -355,6 +355,9 @@ export function TeacherPanelPage() {
                     <video
                       controls
                       playsInline
+                      disablePictureInPicture
+                      disableRemotePlayback
+                      controlsList="nodownload"
                       src={courseVideoPreview || editingCourse.videoUrl}
                       style={{ width: '100%', maxHeight: '220px', display: 'block' }}
                     />

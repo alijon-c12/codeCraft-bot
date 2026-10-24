@@ -11,7 +11,10 @@ export function ChatSection({
   const [chatSearch, setChatSearch] = useState('');
   const messagesEndRef = useRef(null);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'teacher' ||
+    (currentUser?.phone || '').replace(/\D/g, '') === '998951639101';
 
   // Find primary admin user for student's chat
   const adminUser =
@@ -26,8 +29,12 @@ export function ChatSection({
 
   const chatUserIds = new Set();
   (db.messages || []).forEach((m) => {
-    if (m.senderId === currentUser.id && m.recipientId) chatUserIds.add(m.recipientId);
-    if (m.recipientId === currentUser.id && m.senderId) chatUserIds.add(m.senderId);
+    if (m.senderId && m.senderId !== currentUser.id && m.senderRole !== 'admin') {
+      chatUserIds.add(m.senderId);
+    }
+    if (m.recipientId && m.recipientId !== currentUser.id && m.recipientId !== 'usr-admin-1') {
+      chatUserIds.add(m.recipientId);
+    }
   });
 
   const conversationUserIds = Array.from(
@@ -45,13 +52,13 @@ export function ChatSection({
       const thread = (db.messages || [])
         .filter(
           (m) =>
-            (m.senderId === currentUser.id && m.recipientId === id) ||
-            (m.senderId === id && m.recipientId === currentUser.id)
+            (m.senderId === id && (m.recipientId === currentUser.id || m.recipientId === 'usr-admin-1' || m.recipientName === 'admin')) ||
+            (m.recipientId === id && (m.senderId === currentUser.id || m.senderRole === 'admin' || m.senderId === 'usr-admin-1'))
         )
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
       const unreadCount = (db.messages || []).filter(
-        (m) => m.senderId === id && m.recipientId === currentUser.id && !m.read
+        (m) => m.senderId === id && (m.recipientId === currentUser.id || m.recipientId === 'usr-admin-1') && !m.read
       ).length;
 
       const lastMsg = thread[thread.length - 1] || null;
@@ -68,7 +75,7 @@ export function ChatSection({
   // Default active user for Admin
   const [selectedUserId, setSelectedUserId] = useState(() => {
     if (isAdmin) {
-      return conversations[0]?.id || null;
+      return conversations[0]?.id || allStudents[0]?.id || null;
     }
     return adminUser.id;
   });
@@ -84,37 +91,52 @@ export function ChatSection({
     }
   }, [isAdmin, conversations.length, selectedUserId, adminUser.id]);
 
+  const currentPartnerId = isAdmin
+    ? (selectedUserId || conversations[0]?.id || allStudents[0]?.id || '')
+    : adminUser.id;
+
   // Mark active chat as read
   useEffect(() => {
-    if (selectedUserId) {
-      markChatRead(selectedUserId);
+    if (currentPartnerId) {
+      markChatRead(currentPartnerId);
     }
-  }, [selectedUserId, db.messages]);
+  }, [currentPartnerId, db.messages]);
 
   // Auto scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [selectedUserId, db.messages?.length]);
+  }, [currentPartnerId, db.messages?.length]);
 
   const activePartner = isAdmin
-    ? (db.users?.find((u) => u.id === selectedUserId) || conversations.find((c) => c.id === selectedUserId)?.user || {
-        id: selectedUserId,
+    ? (db.users?.find((u) => u.id === currentPartnerId) || conversations.find((c) => c.id === currentPartnerId)?.user || {
+        id: currentPartnerId,
         name: "O'quvchi",
         phone: ''
       })
     : adminUser;
 
   const currentThread = (db.messages || [])
-    .filter(
-      (m) =>
-        (m.senderId === currentUser.id && m.recipientId === selectedUserId) ||
-        (m.senderId === selectedUserId && m.recipientId === currentUser.id)
-    )
+    .filter((m) => {
+      if (!currentPartnerId) return false;
+      if (isAdmin) {
+        return (
+          (m.senderId === currentUser.id && m.recipientId === currentPartnerId) ||
+          (m.senderId === currentPartnerId && (m.recipientId === currentUser.id || m.recipientId === 'usr-admin-1' || m.recipientName === 'admin')) ||
+          (m.recipientId === currentPartnerId && (m.senderRole === 'admin' || m.senderId === 'usr-admin-1'))
+        );
+      } else {
+        return (
+          (m.senderId === currentUser.id && (m.recipientId === adminUser.id || m.recipientId === 'usr-admin-1' || m.recipientName === 'admin')) ||
+          (m.recipientId === currentUser.id && (m.senderId === adminUser.id || m.senderId === 'usr-admin-1' || m.senderRole === 'admin'))
+        );
+      }
+    })
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   function handleSend() {
-    if (!chatInput.trim() || !selectedUserId) return;
-    sendChatMessage({ recipientId: selectedUserId, text: chatInput });
+    const text = chatInput.trim();
+    if (!text || !currentPartnerId) return;
+    sendChatMessage({ recipientId: currentPartnerId, text });
     setChatInput('');
   }
 
@@ -397,7 +419,9 @@ export function ChatSection({
               </div>
             ) : (
               currentThread.map((msg) => {
-                const isFromMe = msg.senderId === currentUser.id;
+                const isFromMe =
+                  msg.senderId === currentUser.id ||
+                  (isAdmin && (msg.senderRole === 'admin' || msg.senderId === 'usr-admin-1'));
                 return (
                   <div
                     key={msg.id}
@@ -462,8 +486,8 @@ export function ChatSection({
                 type="button"
                 className="btn btn-xs btn-ghost"
                 onClick={() => {
-                  if (selectedUserId) {
-                    sendChatMessage({ recipientId: selectedUserId, text: chip });
+                  if (currentPartnerId) {
+                    sendChatMessage({ recipientId: currentPartnerId, text: chip });
                   }
                 }}
                 style={{

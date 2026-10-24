@@ -245,8 +245,22 @@ export function AppProvider({ children }) {
 
   function applyCleanDb(rawDb) {
     const prev = dbRef.current;
+
+    // Smart merge messages so newly sent or in-flight messages are never lost
+    const msgMap = new Map();
+    for (const m of [...(prev?.messages || []), ...(rawDb?.messages || [])]) {
+      if (m && m.id) {
+        const existing = msgMap.get(m.id);
+        msgMap.set(m.id, existing ? { ...existing, ...m, read: Boolean(existing.read || m.read) } : m);
+      }
+    }
+    const mergedMessages = Array.from(msgMap.values()).sort(
+      (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+
     const mergedRaw = {
       ...rawDb,
+      messages: mergedMessages,
       deletedCourseIds: Array.from(
         new Set([...(prev?.deletedCourseIds || []), ...(rawDb?.deletedCourseIds || [])])
       ),
@@ -906,6 +920,66 @@ export function AppProvider({ children }) {
 
       return draft;
     });
+  }
+
+  function returnCourseToAdmin(courseId) {
+    if (!currentUser || !courseId) return;
+    const course = db.courses.find((c) => c.id === courseId);
+    const courseTitle = course ? loc(course, 'title') : 'Kurs';
+
+    const confirmMsg = lang === 'ru'
+      ? `Вы действительно хотите вернуть курс "${courseTitle}" администратору? Доступ к курсу будет закрыт.`
+      : `Haqiqatan ham "${courseTitle}" kursini adminga qaytarmoqchimisiz? Kursga kirish huquqi bekor qilinadi.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    updateDb(
+      (draft) => {
+        // 1. Remove enrollment
+        draft.enrollments = (draft.enrollments || []).filter(
+          (e) => !(e.userId === currentUser.id && (e.courseId === courseId || e.courseId === 'all'))
+        );
+
+        // 2. Mark payments for this course as cancelled/refunded
+        (draft.payments || []).forEach((p) => {
+          if (p.userId === currentUser.id && (p.courseId === courseId || p.courseId === 'all')) {
+            p.status = 'cancelled';
+            p._adminModified = Date.now();
+          }
+        });
+
+        // 3. Recalculate studentsCount
+        if (Array.isArray(draft.courses)) {
+          draft.courses.forEach((c) => {
+            c.studentsCount = (draft.enrollments || []).filter((e) => e.courseId === c.id).length;
+          });
+        }
+
+        // 4. Send notification to Admin
+        draft.notifications = draft.notifications || [];
+        draft.notifications.unshift({
+          id: `notif-adm-${Date.now()}`,
+          userId: 'usr-admin-1',
+          textUz: `🔄 Talaba ${currentUser.name} (${currentUser.phone || ''}) "${courseTitle}" kursini adminga qaytardi. Kursga kirish yopildi.`,
+          textRu: `🔄 Студент ${currentUser.name} (${currentUser.phone || ''}) вернул курс "${courseTitle}" администратору. Доступ закрыт.`,
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+
+        return draft;
+      },
+      {
+        action: 'COURSE_RETURNED_BY_STUDENT',
+        details: `Talaba (${currentUser.name}) "${courseTitle}" kursini adminga qaytardi`
+      }
+    );
+
+    showToast(
+      lang === 'ru'
+        ? 'Курс успешно возвращён администратору!'
+        : 'Kurs muvaffaqiyatli adminga qaytarildi!',
+      'info'
+    );
   }
 
   function getCourseLessons(courseId) {
@@ -2399,6 +2473,7 @@ export function AppProvider({ children }) {
         hasPendingPayment,
         validateReceiptImage,
         enrollInAllCourses,
+        returnCourseToAdmin,
         getCourseLessons,
         getCourseProgress,
         canAccessLesson,
