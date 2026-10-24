@@ -134,18 +134,10 @@ function sanitizeDb(data) {
     // Remove obsolete removed courses if present
     clone.courses = clone.courses.filter((c) => c.id !== 'crs-4' && c.id !== 'crs-6');
 
-    // Ensure essential courses for Frontend, Backend and AI exist
-    ['cat-frontend', 'cat-backend', 'cat-ai-data'].forEach((catId) => {
-      const hasCourse = clone.courses.some((c) => c.categoryId === catId);
-      if (!hasCourse) {
-        const seedForCat = initialDatabase.courses.filter((c) => c.categoryId === catId);
-        seedForCat.forEach((sc) => {
-          if (!clone.courses.some((c) => c.id === sc.id)) {
-            clone.courses.push(structuredClone(sc));
-          }
-        });
-      }
-    });
+    // Never resurrect courses deleted by admin
+    if (Array.isArray(clone.deletedCourseIds) && clone.deletedCourseIds.length > 0) {
+      clone.courses = clone.courses.filter((c) => !clone.deletedCourseIds.includes(c.id));
+    }
 
     clone.courses.forEach((c) => {
       if (!validCatIds.includes(c.categoryId)) {
@@ -1458,14 +1450,25 @@ export function AppProvider({ children }) {
 
   function deleteCourse(courseId) {
     if (!courseId) return;
-    updateDb((draft) => {
-      draft.courses = draft.courses.filter((c) => c.id !== courseId);
-      const modIds = draft.modules.filter((m) => m.courseId === courseId).map((m) => m.id);
-      draft.modules = draft.modules.filter((m) => m.courseId !== courseId);
-      draft.lessons = draft.lessons.filter((l) => !modIds.includes(l.moduleId));
-      return draft;
-    });
-    showToast(lang === 'ru' ? 'Курс удален' : "Kurs o'chirildi", 'info');
+    updateDb(
+      (draft) => {
+        draft.courses = (draft.courses || []).filter((c) => c.id !== courseId);
+        const modIds = (draft.modules || []).filter((m) => m.courseId === courseId).map((m) => m.id);
+        draft.modules = (draft.modules || []).filter((m) => m.courseId !== courseId);
+        draft.lessons = (draft.lessons || []).filter((l) => !modIds.includes(l.moduleId));
+        draft.enrollments = (draft.enrollments || []).filter((e) => e.courseId !== courseId);
+        draft.deletedCourseIds = draft.deletedCourseIds || [];
+        if (!draft.deletedCourseIds.includes(courseId)) {
+          draft.deletedCourseIds.push(courseId);
+        }
+        return draft;
+      },
+      {
+        action: 'COURSE_DELETED',
+        details: `Kurs (${courseId}) butunlay o'chirildi`
+      }
+    );
+    showToast(lang === 'ru' ? 'Курс успешно удален' : "Kurs butunlay o'chirildi", 'info');
   }
 
   function moveLessonOrder(lessonId, direction) {
@@ -1835,17 +1838,43 @@ export function AppProvider({ children }) {
   }
 
   function adminDeleteCourse(courseId) {
+    if (!courseId) return;
     updateDb(
       (draft) => {
-        draft.courses = draft.courses.filter((c) => c.id !== courseId);
+        draft.courses = (draft.courses || []).filter((c) => c.id !== courseId);
+        const modIds = (draft.modules || []).filter((m) => m.courseId === courseId).map((m) => m.id);
+        draft.modules = (draft.modules || []).filter((m) => m.courseId !== courseId);
+        draft.lessons = (draft.lessons || []).filter((l) => !modIds.includes(l.moduleId));
+        draft.enrollments = (draft.enrollments || []).filter((e) => e.courseId !== courseId);
+        draft.deletedCourseIds = draft.deletedCourseIds || [];
+        if (!draft.deletedCourseIds.includes(courseId)) {
+          draft.deletedCourseIds.push(courseId);
+        }
         return draft;
       },
       {
         action: 'COURSE_DELETED',
-        details: `Kurs (${courseId}) o'chirildi`
+        details: `Kurs (${courseId}) butunlay o'chirildi`
       }
     );
-    showToast("Kurs o'chirildi", 'info');
+    showToast(lang === 'ru' ? 'Курс успешно удален' : "Kurs butunlay o'chirildi", 'info');
+  }
+
+  function adminResetDefaultCourses() {
+    updateDb(
+      (draft) => {
+        draft.courses = structuredClone(initialDatabase.courses);
+        draft.modules = structuredClone(initialDatabase.modules);
+        draft.lessons = structuredClone(initialDatabase.lessons);
+        draft.deletedCourseIds = [];
+        return draft;
+      },
+      {
+        action: 'COURSES_RESET',
+        details: 'Standart kurslar qayta tiklandi'
+      }
+    );
+    showToast(lang === 'ru' ? 'Стандартные курсы восстановлены' : "Standart kurslar qayta tiklandi", 'success');
   }
 
   function adminSaveCategory(catData) {
@@ -2090,6 +2119,7 @@ export function AppProvider({ children }) {
         adminBroadcastMessage,
         adminToggleCourseStatus,
         adminDeleteCourse,
+        adminResetDefaultCourses,
         adminSaveCategory,
         adminDeleteCategory,
         adminSavePromo,

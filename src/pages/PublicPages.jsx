@@ -495,24 +495,7 @@ export function CoursesCatalogPage() {
     }
   ];
 
-  const allAvailableCourses = (db.courses && db.courses.length > 0) ? db.courses : initialDatabase.courses;
-  
-  // Guarantee each track has at least its seed courses if none present in db
-  const trackIds = ['cat-frontend', 'cat-backend', 'cat-ai-data'];
-  const enrichedCourses = [...allAvailableCourses];
-  trackIds.forEach((tId) => {
-    const hasAny = enrichedCourses.some((c) => c.categoryId === tId);
-    if (!hasAny) {
-      const seedMatches = initialDatabase.courses.filter((c) => c.categoryId === tId);
-      seedMatches.forEach((sm) => {
-        if (!enrichedCourses.some((ec) => ec.id === sm.id)) {
-          enrichedCourses.push(sm);
-        }
-      });
-    }
-  });
-
-  const publishedCourses = enrichedCourses.filter((c) => c.status === 'published' || !c.status);
+  const publishedCourses = (db.courses || []).filter((c) => c.status === 'published' || !c.status);
 
   function courseMatchesCategory(c, categoryId) {
     if (categoryId === 'all') return true;

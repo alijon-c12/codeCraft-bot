@@ -46,31 +46,7 @@
       "icon": "palette"
     }
   ],
-  "courses": [
-    {
-      "id": "crs-1792778142182",
-      "titleUz": "Kurs",
-      "titleRu": "Kurs",
-      "slug": "kurs",
-      "descriptionUz": "Kurs",
-      "descriptionRu": "Kurs",
-      "price": 100000,
-      "discountPrice": null,
-      "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "level": "beginner",
-      "language": "O'zbek / Русский",
-      "status": "published",
-      "teacherId": "usr-teacher-1",
-      "categoryId": "cat-backend",
-      "durationHours": 40,
-      "studentsCount": 0,
-      "rating": 5,
-      "createdAt": "2026-10-23T17:55:42.182Z"
-    }
-  ],
+  "courses": [],
   "modules": [
     {
       "id": "mod-201",
@@ -684,6 +660,30 @@
   ],
   "auditLogs": [
     {
+      "id": "aud-1792829940013",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-3) o'chirildi",
+      "createdAt": "2026-10-24T08:19:00.013Z"
+    },
+    {
+      "id": "aud-1792829939372",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1) o'chirildi",
+      "createdAt": "2026-10-24T08:18:59.372Z"
+    },
+    {
+      "id": "aud-1792829938616",
+      "userId": "usr-admin-1",
+      "userName": "Admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792778142182) o'chirildi",
+      "createdAt": "2026-10-24T08:18:58.616Z"
+    },
+    {
       "id": "aud-1792778142182",
       "userId": "usr-admin-1",
       "userName": "Admin",
@@ -1051,14 +1051,14 @@
       "username": "Developper_Ali",
       "firstName": "{._.}",
       "phone": "998501178192",
-      "updatedAt": "2026-10-21T14:04:42.847Z"
+      "updatedAt": "2026-10-24T07:42:01.401Z"
     },
     "6697661818": {
       "chatId": "6697661818",
       "username": "Ali_fron",
       "firstName": "ALI",
       "phone": "998951639101",
-      "updatedAt": "2026-10-18T15:16:48.244Z"
+      "updatedAt": "2026-10-24T07:42:01.764Z"
     },
     "8952962465": {
       "chatId": "8952962465",

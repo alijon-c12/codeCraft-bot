@@ -542,6 +542,7 @@ export function AdminPanelPage() {
     adminBroadcastMessage,
     adminToggleCourseStatus,
     adminDeleteCourse,
+    adminResetDefaultCourses,
     exportPaymentsCsv,
     adminConfirmPayment,
     adminCancelPayment,
@@ -1325,54 +1326,143 @@ export function AdminPanelPage() {
         {/* 3. COURSES MANAGEMENT */}
         {activeTab === 'courses' && (
           <div className="tab-panel">
-            <div className="table-card">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{lang === 'ru' ? "Курс" : "Kurs"}</th>
-                    <th>{lang === 'ru' ? "Преподаватель" : "Ustoz"}</th>
-                    <th>{lang === 'ru' ? "Цена" : "Narx"}</th>
-                    <th>{lang === 'ru' ? "Статус" : "Holati"}</th>
-                    <th>{lang === 'ru' ? "Действия" : "Amallar"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {db.courses.map((c) => {
-                    const teacher = db.users.find((u) => u.id === c.teacherId);
-                    return (
-                      <tr key={c.id}>
-                        <td><strong>{loc(c, 'title')}</strong></td>
-                        <td>{teacher?.name}</td>
-                        <td>{formatPrice(c.discountPrice || c.price)}</td>
-                        <td>
-                          <span className={`status-pill ${c.status === 'published' ? 'paid' : 'pending'}`}>
-                            {c.status === 'published'
-                              ? (lang === 'ru' ? 'ОПУБЛИКОВАН' : "E'LON QILINGAN")
-                              : (lang === 'ru' ? 'ЧЕРНОВИК' : "QORALAMA")}
-                          </span>
-                        </td>
-                        <td className="actions-cell">
-                          <button
-                            className="btn btn-xs btn-outline"
-                            onClick={() => adminToggleCourseStatus(c.id)}
-                          >
-                            {c.status === 'published'
-                              ? (lang === 'ru' ? 'В черновик' : 'Qoralamaga olish')
-                              : (lang === 'ru' ? 'Опубликовать' : 'Tasdiqlash')}
-                          </button>
-                          <button
-                            className="btn btn-xs btn-ghost"
-                            onClick={() => adminDeleteCourse(c.id)}
-                          >
-                            {lang === 'ru' ? "🗑️ Удалить" : "🗑️ O'chirish"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem' }}>
+                  {lang === 'ru' ? 'Управление курсами' : 'Kurslarni boshqarish'}
+                </h3>
+                <small className="text-muted">
+                  {lang === 'ru'
+                    ? `Всего курсов в базе данных: ${db.courses.length}`
+                    : `Ma'lumotlar bazasida jami kurslar: ${db.courses.length} ta`}
+                </small>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => navigate('teacher')}
+                >
+                  ➕ {lang === 'ru' ? 'Создать новый курс' : 'Yangi kurs yaratish'}
+                </button>
+                {db.courses.length === 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={adminResetDefaultCourses}
+                  >
+                    🔄 {lang === 'ru' ? 'Восстановить стандартные курсы' : 'Standart kurslarni qaytarish'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {db.courses.length === 0 ? (
+              <div className="empty-box" style={{ padding: '48px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📚</div>
+                <h4>{lang === 'ru' ? 'Курсы отсутствуют' : 'Bazada hech qanday kurs mavjud emas'}</h4>
+                <p className="text-muted" style={{ marginBottom: '18px' }}>
+                  {lang === 'ru'
+                    ? 'Все курсы были удалены. Вы можете создать новый курс или восстановить стандартные.'
+                    : "Barcha kurslar o'chirilgan. Yangi kurs yaratishingiz yoki standart kurslarni qayta tiklashingiz mumkin."}
+                </p>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                  <button type="button" className="btn btn-primary" onClick={() => navigate('teacher')}>
+                    ➕ {lang === 'ru' ? 'Создать курс' : 'Yangi kurs yaratish'}
+                  </button>
+                  <button type="button" className="btn btn-outline" onClick={adminResetDefaultCourses}>
+                    🔄 {lang === 'ru' ? 'Восстановить стандартные' : 'Standart kurslarni tiklash'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="table-card">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{lang === 'ru' ? "Курс" : "Kurs"}</th>
+                      <th>{lang === 'ru' ? "Направление" : "Yo'nalish"}</th>
+                      <th>{lang === 'ru' ? "Преподаватель" : "Ustoz"}</th>
+                      <th>{lang === 'ru' ? "Цена" : "Narx"}</th>
+                      <th>{lang === 'ru' ? "Статус" : "Holati"}</th>
+                      <th style={{ textAlign: 'right' }}>{lang === 'ru' ? "Действия" : "Amallar"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {db.courses.map((c) => {
+                      const teacher = db.users.find((u) => u.id === c.teacherId);
+                      const cat = db.categories.find((cat) => cat.id === c.categoryId);
+                      return (
+                        <tr key={c.id}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {c.thumbnail && (
+                                <img
+                                  src={c.thumbnail}
+                                  alt=""
+                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }}
+                                />
+                              )}
+                              <div>
+                                <strong>{loc(c, 'title')}</strong>
+                                <small style={{ display: 'block', color: 'var(--text-muted)' }}>ID: {c.id}</small>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="course-cat-badge" style={{ fontSize: '0.78rem' }}>
+                              {loc(cat, 'name') || c.categoryId}
+                            </span>
+                          </td>
+                          <td>{teacher?.name || 'CodeCraft Ustoz'}</td>
+                          <td>{formatPrice(c.discountPrice || c.price)}</td>
+                          <td>
+                            <span className={`status-pill ${c.status === 'published' ? 'paid' : 'pending'}`}>
+                              {c.status === 'published'
+                                ? (lang === 'ru' ? 'ОПУБЛИКОВАН' : "E'LON QILINGAN")
+                                : (lang === 'ru' ? 'ЧЕРНОВИК' : "QORALAMA")}
+                            </span>
+                          </td>
+                          <td className="actions-cell" style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-outline"
+                              onClick={() => adminToggleCourseStatus(c.id)}
+                            >
+                              {c.status === 'published'
+                                ? (lang === 'ru' ? 'В черновик' : 'Qoralama')
+                                : (lang === 'ru' ? 'Опубликовать' : "E'lon qilish")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-xs"
+                              style={{
+                                color: '#ef4444',
+                                borderColor: 'rgba(239, 68, 68, 0.4)',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                fontWeight: '600'
+                              }}
+                              onClick={() => {
+                                const courseName = loc(c, 'title');
+                                const confirmText = lang === 'ru'
+                                  ? `Вы действительно хотите навсегда удалить курс "${courseName}"?`
+                                  : `Haqiqatan ham "${courseName}" kursini butunlay o'chirmoqchimisiz?`;
+                                if (window.confirm(confirmText)) {
+                                  adminDeleteCourse(c.id);
+                                }
+                              }}
+                              title={lang === 'ru' ? 'Удалить этот курс' : "Ushbu kursni butunlay o'chirish"}
+                            >
+                              🗑️ {lang === 'ru' ? "Удалить" : "O'chirish"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
