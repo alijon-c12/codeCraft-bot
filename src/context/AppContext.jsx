@@ -1814,11 +1814,16 @@ export function AppProvider({ children }) {
         sub.status = 'graded';
 
         const asg = draft.assignments.find((a) => a.id === sub.assignmentId);
+        const asgTitleUz = asg?.titleUz || asg?.title || asg?.titleRu || 'Uy vazifasi';
+        const asgTitleRu = asg?.titleRu || asg?.title || asg?.titleUz || 'Домашнее задание';
+        const commentUz = teacherComment ? ` Ustoz izohi: ${teacherComment}` : '';
+        const commentRu = teacherComment ? ` Комментарий преподавателя: ${teacherComment}` : '';
+
         draft.notifications.unshift({
           id: `notif-${Date.now()}`,
           userId: sub.userId,
-          textUz: `📝 Uy vazifangiz tekshirildi: "${asg?.titleUz}" — Ball: ${score}/100. Ustoz izohi: ${teacherComment}`,
-          textRu: `📝 Домашнее задание проверено: "${asg?.titleRu}" — Балл: ${score}/100. Комментарий: ${teacherComment}`,
+          textUz: `📝 Uy vazifangiz tekshirildi: "${asgTitleUz}" — Ball: ${score}/100.${commentUz}`,
+          textRu: `📝 Домашнее задание проверено: "${asgTitleRu}" — Балл: ${score}/100.${commentRu}`,
           read: false,
           createdAt: new Date().toISOString()
         });
@@ -1829,7 +1834,12 @@ export function AppProvider({ children }) {
         details: `Topshiriq (${submissionId}) ${score} ball bilan baholandi`
       }
     );
-    showToast('Vazifa baholandi va talabaga xabarnoma yuborildi!', 'success');
+    showToast(
+      lang === 'ru'
+        ? 'Задание проверено, студенту отправлено уведомление!'
+        : 'Vazifa baholandi va talabaga xabarnoma yuborildi!',
+      'success'
+    );
   }
 
   // ADMIN PANEL ACTIONS (Step 11 — all logged to AuditLog)

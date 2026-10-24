@@ -423,9 +423,12 @@ export function TeacherPanelPage() {
               {db.submissions.map((sub) => {
                 const st = db.users.find((u) => u.id === sub.userId);
                 const asg = db.assignments.find((a) => a.id === sub.assignmentId);
+                const defaultComment = lang === 'ru'
+                  ? "Отличный результат, практическое задание выполнено полностью!"
+                  : "Ajoyib natija, amaliy topshiriq to'liq bajarilgan!";
                 const g = gradingState[sub.id] || {
                   score: sub.score ?? 90,
-                  comment: sub.teacherComment || "Ajoyib natija, amaliy topshiriq to'liq bajarilgan!"
+                  comment: sub.teacherComment || defaultComment
                 };
 
                 return (
@@ -434,11 +437,16 @@ export function TeacherPanelPage() {
                       <div>
                         <h4>{loc(asg, 'title')}</h4>
                         <span className="text-muted">
-                          Talaba: <strong>{st?.name}</strong> • Fayl: <code>{sub.fileName}</code>
+                          {lang === 'ru' ? 'Студент:' : 'Talaba:'} <strong>{st?.name}</strong>
+                          {sub.fileName && (
+                            <> • {lang === 'ru' ? 'Файл:' : 'Fayl:'} <code>{sub.fileName}</code></>
+                          )}
                         </span>
                       </div>
                       <span className={`status-pill ${sub.status === 'graded' ? 'paid' : 'pending'}`}>
-                        {sub.status.toUpperCase()}
+                        {sub.status === 'graded'
+                          ? (lang === 'ru' ? 'ПРОВЕРЕНО' : 'BAHOLANGAN')
+                          : (lang === 'ru' ? 'ОЖИДАЕТ' : 'KUTILMOQDA')}
                       </span>
                     </div>
                     <p className="submission-answer-box">{sub.answerText}</p>
@@ -449,7 +457,7 @@ export function TeacherPanelPage() {
                         className="input score-input"
                         min={0}
                         max={100}
-                        placeholder="Ball (0-100)"
+                        placeholder={lang === 'ru' ? "Балл (0-100)" : "Ball (0-100)"}
                         value={g.score}
                         onChange={(e) =>
                           setGradingState({

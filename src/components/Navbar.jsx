@@ -43,9 +43,13 @@ export function Navbar() {
         <button className="brand-logo" onClick={() => handleNav(currentUser ? 'courses' : 'home')}>
           <div className="brand-logo-42-badge" style={{ padding: 0, overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img
-              src="/favicon.png"
+              src="/logo.jpg"
               alt="CodeCraft"
-              style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+              style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/favicon.png';
+              }}
             />
           </div>
           <div className="brand-text">
