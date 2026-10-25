@@ -91,7 +91,10 @@ let messagesVersion = (globalThis.__codeCraftMessagesVersion = globalThis.__code
 
 export function notifyRealtimeClients(eventType = 'DB_SYNC', payload = {}) {
   currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
-  const dataString = JSON.stringify({ type: eventType, version: currentDbVersion, ...payload });
+  if (eventType === 'NEW_CHAT_MESSAGE' || eventType === 'MESSAGES_READ') {
+    messagesVersion = globalThis.__codeCraftMessagesVersion = Date.now();
+  }
+  const dataString = JSON.stringify({ type: eventType, version: currentDbVersion, messagesVersion, ...payload });
   for (const client of sseClients) {
     try {
       client.write(`data: ${dataString}\n\n`);
@@ -569,10 +572,15 @@ export function createApiMiddleware() {
 
     // 0. GET /api/realtime-stream — Server-Sent Events (SSE) for instant cross-device updates without refreshing
     if (pathname === '/api/realtime-stream' && req.method === 'GET') {
+      try {
+        req.socket?.setNoDelay(true);
+        res.socket?.setNoDelay(true);
+      } catch {}
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
         'Access-Control-Allow-Origin': '*'
       });
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
@@ -638,6 +646,31 @@ export function createApiMiddleware() {
         messagesVersion,
         version: currentDbVersion
       });
+    }
+
+    // 0.13. POST /api/chat/mark-read — Instant message read status update without heavy sync
+    if (pathname === '/api/chat/mark-read' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (body && body.userId && body.otherUserId) {
+        const curDb = readDb();
+        curDb.messages = curDb.messages || [];
+        let changed = false;
+        curDb.messages.forEach((m) => {
+          const forMe = m.recipientId === body.userId || (body.isAdmin && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin'));
+          if (forMe && m.senderId === body.otherUserId && !m.read) {
+            m.read = true;
+            changed = true;
+          }
+        });
+        if (changed) {
+          messagesVersion = globalThis.__codeCraftMessagesVersion = Date.now();
+          currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
+          writeDb(curDb);
+          notifyRealtimeClients('MESSAGES_READ', { messages: curDb.messages, messagesVersion });
+        }
+        return sendJson(res, 200, { ok: true, changed, messages: curDb.messages, messagesVersion });
+      }
+      return sendJson(res, 400, { error: 'Invalid mark-read payload' });
     }
 
     // 0.2. POST /api/media/upload & GET /api/media/:id — Cross-browser video upload & streaming

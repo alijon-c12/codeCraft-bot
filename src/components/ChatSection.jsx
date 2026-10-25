@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useApp } from '../context/AppContext.jsx';
 
 export function ChatSection({
   db,
@@ -7,6 +8,9 @@ export function ChatSection({
   markChatRead,
   lang = 'uz'
 }) {
+  const appCtx = useApp();
+  const applyServerMessages = appCtx?.applyServerMessages;
+
   const [chatInput, setChatInput] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const messagesEndRef = useRef(null);
@@ -110,35 +114,26 @@ export function ChatSection({
   // Real-time polling while ChatSection is mounted (checks for new messages every 800ms)
   useEffect(() => {
     let isCancelled = false;
-    const interval = setInterval(async () => {
+    const pollMessages = async () => {
       try {
         const res = await fetch('/api/chat/messages');
         if (res.ok && !isCancelled) {
           const data = await res.json();
-          if (data && Array.isArray(data.messages)) {
-            const currentIds = new Set((db.messages || []).map((m) => m.id));
-            const hasNew = data.messages.some((m) => !currentIds.has(m.id));
-            if (hasNew) {
-              if (typeof BroadcastChannel !== 'undefined') {
-                const channel = new BroadcastChannel('educenter_db_sync_bus');
-                channel.postMessage({
-                  type: 'DB_SYNC',
-                  timestamp: Date.now(),
-                  db: { ...db, messages: data.messages }
-                });
-                channel.close();
-              }
-            }
+          if (data && Array.isArray(data.messages) && typeof applyServerMessages === 'function') {
+            applyServerMessages(data.messages);
           }
         }
       } catch {}
-    }, 800);
+    };
+
+    pollMessages();
+    const interval = setInterval(pollMessages, 800);
 
     return () => {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [db.messages]);
+  }, [applyServerMessages]);
 
   const activePartner = isAdmin
     ? (db.users?.find((u) => u.id === currentPartnerId) || conversations.find((c) => c.id === currentPartnerId)?.user || {

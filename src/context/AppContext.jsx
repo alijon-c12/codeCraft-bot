@@ -292,6 +292,42 @@ export function AppProvider({ children }) {
     return clean;
   }
 
+  function applyServerMessages(serverMessages) {
+    if (!Array.isArray(serverMessages)) return;
+    const prev = dbRef.current;
+    const prevMsgs = prev?.messages || [];
+    const msgMap = new Map();
+    for (const m of [...prevMsgs, ...serverMessages]) {
+      if (m && m.id) {
+        const existing = msgMap.get(m.id);
+        msgMap.set(m.id, existing ? { ...existing, ...m, read: Boolean(existing.read || m.read) } : m);
+      }
+    }
+    const merged = Array.from(msgMap.values()).sort(
+      (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+
+    // If identical to prevMsgs, do nothing (prevent re-renders)
+    if (merged.length === prevMsgs.length) {
+      let isIdentical = true;
+      for (let i = 0; i < merged.length; i++) {
+        if (merged[i].id !== prevMsgs[i].id || merged[i].read !== prevMsgs[i].read) {
+          isIdentical = false;
+          break;
+        }
+      }
+      if (isIdentical) return;
+    }
+
+    const nextDb = { ...prev, messages: merged };
+    dbRef.current = nextDb;
+    setDb(nextDb);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextDb));
+    } catch {}
+    broadcastLocalDbChange(nextDb);
+  }
+
   // Real-time synchronization across browser tabs (BroadcastChannel + Storage)
   // and across devices / clients (Server-Sent Events + smart polling)
   useEffect(() => {
@@ -299,11 +335,11 @@ export function AppProvider({ children }) {
     let isFetching = false;
 
     const fetchLatestServerState = async () => {
-      if (isFetching || activeSyncsRef.current > 0) return;
+      if (isFetching) return;
       isFetching = true;
       try {
         const r = await fetch('/api/state');
-        if (r.ok && activeSyncsRef.current === 0) {
+        if (r.ok) {
           const serverData = await r.json();
           if (serverData && Array.isArray(serverData.courses)) {
             applyCleanDb(serverData);
@@ -354,14 +390,11 @@ export function AppProvider({ children }) {
         eventSource.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data);
-            if (msg.type === 'NEW_CHAT_MESSAGE') {
+            if (msg.type === 'NEW_CHAT_MESSAGE' || msg.type === 'MESSAGES_READ') {
               if (Array.isArray(msg.messages)) {
-                applyCleanDb({ ...dbRef.current, messages: msg.messages });
+                applyServerMessages(msg.messages);
               } else if (msg.message) {
-                const prevMsgs = dbRef.current?.messages || [];
-                if (!prevMsgs.some((m) => m.id === msg.message.id)) {
-                  applyCleanDb({ ...dbRef.current, messages: [...prevMsgs, msg.message] });
-                }
+                applyServerMessages([msg.message]);
               }
             } else if (msg.type === 'DB_SYNC' || msg.type === 'PAYMENT_REQUESTED') {
               if (msg.version && msg.version !== lastKnownVersion) {
@@ -370,6 +403,7 @@ export function AppProvider({ children }) {
               fetchLatestServerState();
             } else if (msg.type === 'CONNECTED' && msg.version) {
               lastKnownVersion = msg.version;
+              lastKnownMessagesVersion = msg.messagesVersion || lastKnownMessagesVersion;
             }
           } catch {}
         };
@@ -385,18 +419,45 @@ export function AppProvider({ children }) {
         const res = await fetch('/api/version');
         if (res.ok) {
           const data = await res.json();
-          if (data && data.version) {
-            const versionChanged = lastKnownVersion !== null && data.version !== lastKnownVersion;
-            const messagesChanged =
-              (lastKnownMessagesCount !== null && data.messagesCount !== lastKnownMessagesCount) ||
-              (lastKnownMessagesVersion !== null && data.messagesVersion && data.messagesVersion !== lastKnownMessagesVersion);
+          if (data) {
+            // 1. Instant check for chat messages delta
+            if (data.messagesVersion && data.messagesVersion !== lastKnownMessagesVersion) {
+              lastKnownMessagesVersion = data.messagesVersion;
+              lastKnownMessagesCount = data.messagesCount;
+              try {
+                const chatRes = await fetch('/api/chat/messages');
+                if (chatRes.ok) {
+                  const chatData = await chatRes.json();
+                  if (chatData && Array.isArray(chatData.messages)) {
+                    applyServerMessages(chatData.messages);
+                  }
+                }
+              } catch {}
+            } else if (
+              data.messagesCount !== null &&
+              lastKnownMessagesCount !== null &&
+              data.messagesCount !== lastKnownMessagesCount
+            ) {
+              lastKnownMessagesCount = data.messagesCount;
+              try {
+                const chatRes = await fetch('/api/chat/messages');
+                if (chatRes.ok) {
+                  const chatData = await chatRes.json();
+                  if (chatData && Array.isArray(chatData.messages)) {
+                    applyServerMessages(chatData.messages);
+                  }
+                }
+              } catch {}
+            }
 
-            lastKnownVersion = data.version;
-            lastKnownMessagesCount = data.messagesCount;
-            lastKnownMessagesVersion = data.messagesVersion || 0;
-
-            if (versionChanged || messagesChanged) {
+            // 2. Global state change check
+            if (lastKnownVersion !== null && data.version !== lastKnownVersion) {
+              lastKnownVersion = data.version;
               fetchLatestServerState();
+            } else if (lastKnownVersion === null) {
+              lastKnownVersion = data.version;
+              lastKnownMessagesVersion = data.messagesVersion || lastKnownMessagesVersion;
+              lastKnownMessagesCount = data.messagesCount || lastKnownMessagesCount;
             }
           }
         }
@@ -2229,16 +2290,10 @@ export function AppProvider({ children }) {
       read: false
     };
 
-    // 1. Immediately apply locally with 0ms delay
-    updateDb((draft) => {
-      draft.messages = draft.messages || [];
-      if (!draft.messages.some((m) => m.id === msgId)) {
-        draft.messages.push(newMsg);
-      }
-      return draft;
-    });
+    // 1. Immediately apply locally with 0ms delay for instant UI feedback
+    applyServerMessages([newMsg]);
 
-    // 2. Direct fast /api/chat/send for immediate multi-device sync
+    // 2. Direct fast /api/chat/send for immediate multi-client delivery
     try {
       fetch('/api/chat/send', {
         method: 'POST',
@@ -2248,7 +2303,7 @@ export function AppProvider({ children }) {
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data && Array.isArray(data.messages)) {
-            applyCleanDb({ ...dbRef.current, messages: data.messages });
+            applyServerMessages(data.messages);
           }
         })
         .catch(() => {});
@@ -2260,16 +2315,32 @@ export function AppProvider({ children }) {
 
   function markChatRead(otherUserId) {
     if (!currentUser || !otherUserId) return;
-    updateDb((draft) => {
-      let changed = false;
-      (draft.messages || []).forEach((m) => {
-        if (m.recipientId === currentUser.id && m.senderId === otherUserId && !m.read) {
-          m.read = true;
-          changed = true;
-        }
-      });
-      return changed ? draft : draft;
+    const isAdmin = currentUser.role === 'admin' || (currentUser.phone || '').replace(/\D/g, '') === ADMIN_PHONE_NORMALIZED;
+    const hasUnread = (dbRef.current?.messages || []).some((m) => {
+      const forMe = m.recipientId === currentUser.id || (isAdmin && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin'));
+      return forMe && m.senderId === otherUserId && !m.read;
     });
+
+    if (!hasUnread) return; // Prevent re-render and sync loops!
+
+    // Mark locally first
+    const updatedMessages = (dbRef.current?.messages || []).map((m) => {
+      const forMe = m.recipientId === currentUser.id || (isAdmin && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin'));
+      if (forMe && m.senderId === otherUserId && !m.read) {
+        return { ...m, read: true };
+      }
+      return m;
+    });
+    applyServerMessages(updatedMessages);
+
+    // Notify backend
+    try {
+      fetch('/api/chat/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id, otherUserId, isAdmin })
+      }).catch(() => {});
+    } catch {}
   }
 
   function adminBroadcastMessage(text) {
@@ -2611,6 +2682,7 @@ export function AppProvider({ children }) {
         adminDeleteUser,
         adminInviteUser,
         adminEnrollUser,
+        applyServerMessages,
         sendChatMessage,
         markChatRead,
         adminBroadcastMessage,
