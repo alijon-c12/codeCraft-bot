@@ -522,17 +522,35 @@
       "createdAt": "2026-03-09T14:15:00.000Z"
     }
   ],
-  "certificates": [
-    {
-      "id": "cert-1792908027379",
-      "userId": "usr-1792831353065",
-      "courseId": "crs-1792907963578",
-      "code": "EC-2026-49XZNL",
-      "issuedAt": "2026-10-25T06:00:27.379Z"
-    }
-  ],
+  "certificates": [],
   "notifications": [],
   "leads": [
+    {
+      "id": "lead-1792912059784",
+      "name": "Alibek A",
+      "phone": "+998 50 117 81 92",
+      "comment": "Men ham sizdek tajribaliy mutaxaasisdan talim olmoqchiman",
+      "recipient": "@Developper_Ali",
+      "status": "new",
+      "createdAt": "2026-10-25T07:07:39.784Z"
+    },
+    {
+      "id": "lead-1792912059539",
+      "name": "Alibek A",
+      "phone": "+998 50 117 81 92",
+      "comment": "Men ham sizdek tajribaliy mutaxaasisdan talim olmoqchiman",
+      "recipient": "@Developper_Ali",
+      "status": "new",
+      "createdAt": "2026-10-25T07:07:39.539Z"
+    },
+    {
+      "id": "lead-1792912059425",
+      "name": "Alibek A",
+      "phone": "+998 50 117 81 92 ",
+      "comment": "Men ham sizdek tajribaliy mutaxaasisdan talim olmoqchiman",
+      "status": "new",
+      "createdAt": "2026-10-25T07:07:39.425Z"
+    },
     {
       "id": "lead-1",
       "name": "Javohir Abdullayev",
@@ -592,7 +610,7 @@
     {
       "id": "faq-4",
       "questionUz": "Kurs yakunida sertifikat beriladimi?",
-      "questionRu": "Выдаётся ли сертификат по окончании курса?",
+      "questionRu": "Выдаётся ли сертификат по окончании кур��а?",
       "answerUz": "Ha! Kursdagi barcha darslarni 100% yakunlaganingizda tizim avtomatik ravishda noyob ID-kodli rasmiy PDF sertifikat yaratadi. Uning haqiqiyligini istalgan ish beruvchi saytimizda tekshirishi mumkin.",
       "answerRu": "Да! ��осле прохождения 100% уроков курса система автоматически генерирует именной сертификат с уникальным кодом проверки подлинности.",
       "order": 4
@@ -625,6 +643,14 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1792911635954",
+      "userId": "usr-1792831353065",
+      "userName": "Clent",
+      "action": "CERTIFICATE_DELETED",
+      "details": "Sertifikat (cert-1792908027379) o'chirildi",
+      "createdAt": "2026-10-25T07:00:35.954Z"
+    },
     {
       "id": "aud-1792908097748",
       "userId": "usr-admin-1",
@@ -1348,6 +1374,27 @@
   ],
   "notificationLogs": [
     {
+      "id": "nlog-1792912059784",
+      "channel": "TELEGRAM",
+      "recipient": "@Developper_Ali",
+      "message": "📨 Yangi murojaat (Aloqa):\n👤 Ism: Alibek A\n📞 Tel: +998 50 117 81 92\n💬 Xabar: Men ham sizdek tajribaliy mutaxaasisdan talim olmoqchiman",
+      "createdAt": "2026-10-25T07:07:39.784Z"
+    },
+    {
+      "id": "nlog-1792912059540",
+      "channel": "TELEGRAM",
+      "recipient": "@Developper_Ali",
+      "message": "📨 Yangi murojaat (Aloqa):\n👤 Ism: Alibek A\n📞 Tel: +998 50 117 81 92\n💬 Xabar: Men ham sizdek tajribaliy mutaxaasisdan talim olmoqchiman",
+      "createdAt": "2026-10-25T07:07:39.540Z"
+    },
+    {
+      "id": "nlog-1792912059425",
+      "channel": "TELEGRAM",
+      "recipient": "@Developper_Ali",
+      "message": "📨 Yangi xabar: Alibek A (+998 50 117 81 92 ) — Men ham sizdek tajribaliy mutaxaasisdan talim olmoqchiman",
+      "createdAt": "2026-10-25T07:07:39.425Z"
+    },
+    {
       "id": "nlog-1792908027379",
       "channel": "EMAIL_SMTP",
       "recipient": "+998 50 1178192",
@@ -1496,50 +1543,6 @@
   "smsCodes": {},
   "messages": [
     {
-      "id": "msg-1792835234436-925",
-      "senderId": "usr-1792831353065",
-      "senderName": "Clent",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "admin",
-      "text": "Assalomu alaykum ustoz!",
-      "createdAt": "2026-10-24T09:47:14.456Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792858737633-723",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "To'lovingiz tasdiqlandi, kursingiz ochildi! 🎉",
-      "createdAt": "2026-10-24T16:18:57.634Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792858775113-430",
-      "senderId": "usr-1792831353065",
-      "senderName": "Clent",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "admin",
-      "text": "hop raxmat",
-      "createdAt": "2026-10-24T16:19:35.117Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792858819586-874",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "To'lovingiz tasdiqlandi, kursingiz ochildi! 🎉",
-      "createdAt": "2026-10-24T16:20:19.588Z",
-      "read": true
-    },
-    {
       "id": "msg-1792860850809",
       "senderId": "usr-admin-1",
       "receiverId": "usr-admin-1",
@@ -1548,122 +1551,12 @@
       "createdAt": "2026-10-24T16:54:10.809Z"
     },
     {
-      "id": "msg-1792861370906-646",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "Assalomu alaykum!",
-      "createdAt": "2026-10-24T17:02:50.910Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792861389235-434",
-      "senderId": "usr-1792831353065",
-      "senderName": "Clent",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "admin",
-      "text": "Assalomu alaykum ustoz!",
-      "createdAt": "2026-10-24T17:03:09.240Z",
-      "read": true
-    },
-    {
       "id": "msg-1792861540371",
       "senderId": "usr-admin-1",
       "receiverId": "usr-admin-1",
       "text": "🔄 Я вернул(а) курс \"dvb vcd\" администратору.",
       "read": false,
       "createdAt": "2026-10-24T17:05:40.371Z"
-    },
-    {
-      "id": "msg-1792863525202-30",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "Vazifangiz tekshirildi va baholandi ✅",
-      "createdAt": "2026-10-24T17:38:45.203Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792863560350-673",
-      "senderId": "usr-1792831353065",
-      "senderName": "Clent",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "admin",
-      "text": "rahnat",
-      "createdAt": "2026-10-24T17:39:20.351Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792863607985-430",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "Qaysi dars yoki mavzu bo'yicha savolingiz bor?",
-      "createdAt": "2026-10-24T17:40:07.988Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792863670968-970",
-      "senderId": "usr-1792831353065",
-      "senderName": "Clent",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "admin",
-      "text": "Kurs bo'yicha savolim bor edi",
-      "createdAt": "2026-10-24T17:41:10.969Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792908106210-449",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "mayli bering",
-      "createdAt": "2026-10-25T06:01:46.210Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792910227206-166",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "test-user",
-      "recipientName": "Foydalanuvchi",
-      "text": "Vazifangiz tekshirildi va baholandi ✅",
-      "createdAt": "2026-10-25T06:37:07.207Z",
-      "read": false
-    },
-    {
-      "id": "msg-1792910248044-365",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "Assalomu alaykum!",
-      "createdAt": "2026-10-25T06:37:28.044Z",
-      "read": true
-    },
-    {
-      "id": "msg-1792910259195-526",
-      "senderId": "usr-1792831353065",
-      "senderName": "Clent",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "admin",
-      "text": "va alekum assalom",
-      "createdAt": "2026-10-25T06:37:39.196Z",
-      "read": true
     }
   ],
   "invitations": [],
@@ -1736,7 +1629,9 @@
     "notif-1792908012019",
     "notif-adm-1792907993243"
   ],
-  "deletedCertificateIds": [],
+  "deletedCertificateIds": [
+    "cert-1792908027379"
+  ],
   "adminSettings": {
     "cardNumber": "9860 2548 0126 8753",
     "cardHolder": "Alibek Abdunabiyev"
@@ -1745,6 +1640,23 @@
     "msg-1792908752290-718",
     "msg-1792909193797-664",
     "msg-1792909808157-901",
-    "msg-1792911294333-725"
+    "msg-1792911294333-725",
+    "msg-1792910259195-526",
+    "msg-1792835234436-925",
+    "msg-1792858737633-723",
+    "msg-1792858775113-430",
+    "msg-1792858819586-874",
+    "msg-1792861370906-646",
+    "msg-1792861389235-434",
+    "msg-1792863525202-30",
+    "msg-1792863560350-673",
+    "msg-1792863607985-430",
+    "msg-1792863670968-970",
+    "msg-1792908106210-449",
+    "msg-1792910248044-365",
+    "msg-1792910227206-166",
+    "msg-1792911585087-234",
+    "msg-1792911594745-620",
+    "msg-1792910055705-514"
   ]
 }

@@ -1712,7 +1712,7 @@ export function AppProvider({ children }) {
     showToast('Sharhingiz uchun rahmat!', 'success');
   }
 
-  function submitLead({ name, phone, comment, recipient = '@Frontend_Ali' }) {
+  function submitLead({ name, phone, comment, recipient = '@Developper_Ali' }) {
     updateDb((draft) => {
       draft.leads.unshift({
         id: `lead-${Date.now()}`,

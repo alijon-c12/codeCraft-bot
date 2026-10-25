@@ -1491,12 +1491,12 @@ export function StaticContentPage({ slug }) {
       : `Assalomu alaykum!\nCodeCraft platformasidan yangi murojaat:\n👤 Ism: ${contactForm.name}\n📞 Tel: ${contactForm.phone}\n💬 Xabar: ${contactForm.comment || "Izohsiz"}`;
     setLastMessage(formattedMessage);
 
-    // 1. Submit lead to database & logs with target @Frontend_Ali
+    // 1. Submit lead to database & logs with target @Developper_Ali
     submitLead({
       name: contactForm.name,
       phone: contactForm.phone,
       comment: contactForm.comment,
-      recipient: '@Frontend_Ali'
+      recipient: '@Developper_Ali'
     });
 
     // 2. Dispatch via backend API endpoint /api/contact
@@ -1508,7 +1508,7 @@ export function StaticContentPage({ slug }) {
           name: contactForm.name,
           phone: contactForm.phone,
           comment: contactForm.comment,
-          recipient: '@Frontend_Ali'
+          recipient: '@Developper_Ali'
         })
       });
     } catch {
@@ -1532,14 +1532,14 @@ export function StaticContentPage({ slug }) {
       // ignore
     }
 
-    // 4. Open Telegram chat directly to @Frontend_Ali with pre-filled message text
-    const tgUrl = `https://t.me/Frontend_Ali?text=${encodeURIComponent(formattedMessage)}`;
+    // 4. Open Telegram chat directly to @Developper_Ali with pre-filled message text
+    const tgUrl = `https://t.me/Developper_Ali?text=${encodeURIComponent(formattedMessage)}`;
     window.open(tgUrl, '_blank', 'noopener,noreferrer');
 
     showToast(
       lang === 'ru'
-        ? 'Сообщение принято! Открываем профиль Телеграм @Frontend_Ali...'
-        : "Xabaringiz yuborildi! @Frontend_Ali Telegram profili ochilmoqda...",
+        ? 'Сообщение принято! Открываем профиль Телеграм @Developper_Ali...'
+        : "Xabaringiz yuborildi! @Developper_Ali Telegram profili ochilmoqda...",
       'success'
     );
 
@@ -1575,7 +1575,7 @@ export function StaticContentPage({ slug }) {
               <p>
                 💬 <strong>{lang === 'ru' ? 'Телеграм:' : 'Telegram:'}</strong>{' '}
                 <a
-                  href="https://t.me/Frontend_Ali"
+                  href="https://t.me/Developper_Ali"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -1591,7 +1591,7 @@ export function StaticContentPage({ slug }) {
                   }}
                   title={lang === 'ru' ? 'Перейти в профиль Телеграм' : "Telegram profilga o'tish"}
                 >
-                  @Frontend_Ali ↗
+                  @Developper_Ali ↗
                 </a>
               </p>
               <div className="map-embed-wrap">
@@ -1620,14 +1620,14 @@ export function StaticContentPage({ slug }) {
                 >
                   <div>
                     {lang === 'ru' ? (
-                      <>✅ <strong>Ваше сообщение принято!</strong> Сообщение направлено в профиль <strong>@Frontend_Ali</strong>.</>
+                      <>✅ <strong>Ваше сообщение принято!</strong> Сообщение направлено в профиль <strong>@Developper_Ali</strong>.</>
                     ) : (
-                      <>✅ <strong>Xabaringiz qabul qilindi!</strong> Xabaringiz <strong>@Frontend_Ali</strong> profiliga yuborildi.</>
+                      <>✅ <strong>Xabaringiz qabul qilindi!</strong> Xabaringiz <strong>@Developper_Ali</strong> profiliga yuborildi.</>
                     )}
                   </div>
                   <div style={{ marginTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <a
-                      href={`https://t.me/Frontend_Ali?text=${encodeURIComponent(lastMessage)}`}
+                      href={`https://t.me/Developper_Ali?text=${encodeURIComponent(lastMessage)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-sm btn-primary"
@@ -1639,7 +1639,7 @@ export function StaticContentPage({ slug }) {
                         fontWeight: '600'
                       }}
                     >
-                      💬 {lang === 'ru' ? 'Отправить сообщение в Телеграм @Frontend_Ali ↗' : 'Telegramda @Frontend_Ali ga xabar yuborish ↗'}
+                      💬 {lang === 'ru' ? 'Отправить сообщение в Телеграм @Developper_Ali ↗' : 'Telegramda @Developper_Ali ga xabar yuborish ↗'}
                     </a>
                     <button
                       type="button"

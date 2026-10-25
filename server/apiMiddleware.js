@@ -1343,12 +1343,12 @@ export function createApiMiddleware() {
       });
     }
 
-    // 8. POST /api/contact — Contact message dispatch to Telegram @Frontend_Ali
+    // 8. POST /api/contact — Contact message dispatch to Telegram @Developper_Ali
     if (pathname === '/api/contact' && req.method === 'POST') {
       if (!checkRateLimit(ip, 'contact', 15, 60_000)) {
         return sendJson(res, 429, { error: 'Too many requests' });
       }
-      const { name, phone, comment, recipient = '@Frontend_Ali' } = await parseJsonBody(req);
+      const { name, phone, comment, recipient = '@Developper_Ali' } = await parseJsonBody(req);
       const cleanName = (name || '').trim();
       const cleanPhone = (phone || '').trim();
       const cleanComment = (comment || '').trim();
@@ -1357,7 +1357,7 @@ export function createApiMiddleware() {
         return sendJson(res, 400, { error: 'Name and phone are required' });
       }
 
-      const targetUsername = 'Frontend_Ali';
+      const targetUsername = 'Developper_Ali';
       const newLead = {
         id: `lead-${Date.now()}`,
         name: cleanName,
