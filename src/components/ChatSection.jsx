@@ -8,8 +8,10 @@ export function ChatSection({
   markChatRead,
   lang = 'uz'
 }) {
-  const appCtx = useApp();
+  const appCtx = useApp ? useApp() : {};
   const applyServerMessages = appCtx?.applyServerMessages;
+  const deleteChatMessage = appCtx?.deleteChatMessage;
+  const clearChatThread = appCtx?.clearChatThread;
 
   const [chatInput, setChatInput] = useState('');
   const [chatSearch, setChatSearch] = useState('');
@@ -337,21 +339,55 @@ export function ChatSection({
                             >
                               {c.lastMsg ? c.lastMsg.text : (lang === 'ru' ? 'Нет сообщений' : 'Xabar yo\'q')}
                             </p>
-                            {c.unreadCount > 0 && (
-                              <span
-                                style={{
-                                  backgroundColor: '#ff5722',
-                                  color: '#fff',
-                                  borderRadius: '99px',
-                                  padding: '2px 7px',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  flexShrink: 0
-                                }}
-                              >
-                                {c.unreadCount}
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {c.unreadCount > 0 && (
+                                <span
+                                  style={{
+                                    backgroundColor: '#ff5722',
+                                    color: '#fff',
+                                    borderRadius: '99px',
+                                    padding: '2px 7px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  {c.unreadCount}
+                                </span>
+                              )}
+                              {c.thread.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const confirmText =
+                                      lang === 'ru'
+                                        ? `Очистить все сообщения со студентом "${c.user.name}"?`
+                                        : `"${c.user.name}" bilan barcha xabarlarni o'chirishni xohlaysizmi?`;
+                                    if (window.confirm(confirmText)) {
+                                      if (typeof clearChatThread === 'function') {
+                                        clearChatThread(c.id);
+                                      }
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '3px 5px',
+                                    cursor: 'pointer',
+                                    color: '#9ca3af',
+                                    fontSize: '0.78rem',
+                                    borderRadius: '4px',
+                                    transition: 'color 0.15s'
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
+                                  title={lang === 'ru' ? 'Очистить чат' : "Chatni tozalash"}
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -439,6 +475,42 @@ export function ChatSection({
               <span className="status-pill paid" style={{ fontSize: '0.78rem' }}>
                 🟢 {lang === 'ru' ? 'В сети' : 'Aloqada'}
               </span>
+              {currentThread.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const confirmText =
+                      lang === 'ru'
+                        ? 'Вы уверены, что хотите удалить все сообщения в этом чате?'
+                        : "Ushbu chatdagi barcha xabarlarni o'chirishni xohlaysizmi?";
+                    if (window.confirm(confirmText)) {
+                      if (typeof clearChatThread === 'function') {
+                        clearChatThread(currentPartnerId);
+                      }
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '8px',
+                    padding: '5px 12px',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.16)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)')}
+                  title={lang === 'ru' ? 'Очистить историю чата' : "Chat tarixini tozalash"}
+                >
+                  <span>🗑️</span>
+                  <span>{lang === 'ru' ? 'Очистить чат' : "Chatni tozalash"}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -508,20 +580,60 @@ export function ChatSection({
                     >
                       {msg.text}
                     </div>
-                    <small
+                    <div
                       style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
                         marginTop: '4px',
                         padding: '0 4px'
                       }}
                     >
-                      {new Date(msg.createdAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                      {isFromMe && ' • ✓✓'}
-                    </small>
+                      <small
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-muted)'
+                        }}
+                      >
+                        {new Date(msg.createdAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                        {isFromMe && ' • ✓✓'}
+                      </small>
+                      {(isFromMe || isAdmin) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const confirmText =
+                              lang === 'ru'
+                                ? 'Удалить это сообщение?'
+                                : "Ushbu xabarni o'chirishni xohlaysizmi?";
+                            if (window.confirm(confirmText)) {
+                              if (typeof deleteChatMessage === 'function') {
+                                deleteChatMessage(msg.id);
+                              }
+                            }
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '2px 4px',
+                            cursor: 'pointer',
+                            color: '#9ca3af',
+                            fontSize: '0.75rem',
+                            borderRadius: '4px',
+                            lineHeight: 1,
+                            transition: 'color 0.15s'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
+                          title={lang === 'ru' ? 'Удалить сообщение' : "Xabarni o'chirish"}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })

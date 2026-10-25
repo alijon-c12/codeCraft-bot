@@ -531,16 +531,7 @@
       "issuedAt": "2026-10-25T06:00:27.379Z"
     }
   ],
-  "notifications": [
-    {
-      "id": "notif-adm-1792907993243",
-      "userId": "usr-admin-1",
-      "textUz": "🛒 Yangi kurs sotib olish so'rovi! Clent (+998 50 1178192) \"Reactga kirish\" kursini sotib olmoqchi (200 000 so'm). Kartaga pul tushganini tasdiqlang!",
-      "textRu": "🛒 Новая заявка на покупку курса! Clent (+998 50 1178192) хочет купить курс \"Reactga kirish\" (200 000 сум). Подтвердите поступление средств на карту!",
-      "read": false,
-      "createdAt": "2026-10-25T05:59:53.314Z"
-    }
-  ],
+  "notifications": [],
   "leads": [
     {
       "id": "lead-1",
@@ -1642,36 +1633,36 @@
       "read": true
     },
     {
-      "id": "msg-1792908752290-718",
-      "senderId": "test-user",
-      "senderName": "Foydalanuvchi",
-      "senderRole": "student",
-      "recipientId": "usr-admin-1",
-      "recipientName": "",
-      "text": "Salom test",
-      "createdAt": "2026-10-25T06:12:32.290Z",
+      "id": "msg-1792910227206-166",
+      "senderId": "usr-admin-1",
+      "senderName": "admin",
+      "senderRole": "admin",
+      "recipientId": "test-user",
+      "recipientName": "Foydalanuvchi",
+      "text": "Vazifangiz tekshirildi va baholandi ✅",
+      "createdAt": "2026-10-25T06:37:07.207Z",
       "read": false
     },
     {
-      "id": "msg-1792909193797-664",
+      "id": "msg-1792910248044-365",
       "senderId": "usr-admin-1",
       "senderName": "admin",
       "senderRole": "admin",
       "recipientId": "usr-1792831353065",
       "recipientName": "Clent",
-      "text": "Realtime SSE test message",
-      "createdAt": "2026-10-25T06:19:53.798Z",
+      "text": "Assalomu alaykum!",
+      "createdAt": "2026-10-25T06:37:28.044Z",
       "read": true
     },
     {
-      "id": "msg-1792909808157-901",
-      "senderId": "usr-admin-1",
-      "senderName": "admin",
-      "senderRole": "admin",
-      "recipientId": "usr-1792831353065",
-      "recipientName": "Clent",
-      "text": "Avtomatik test xabari (realtime)",
-      "createdAt": "2026-10-25T06:30:08.157Z",
+      "id": "msg-1792910259195-526",
+      "senderId": "usr-1792831353065",
+      "senderName": "Clent",
+      "senderRole": "student",
+      "recipientId": "usr-admin-1",
+      "recipientName": "admin",
+      "text": "va alekum assalom",
+      "createdAt": "2026-10-25T06:37:39.196Z",
       "read": true
     }
   ],
@@ -1742,11 +1733,18 @@
     "notif-1792861776348",
     "notif-adm-1792861658259",
     "notif-1792908027379",
-    "notif-1792908012019"
+    "notif-1792908012019",
+    "notif-adm-1792907993243"
   ],
   "deletedCertificateIds": [],
   "adminSettings": {
     "cardNumber": "9860 2548 0126 8753",
     "cardHolder": "Alibek Abdunabiyev"
-  }
+  },
+  "deletedMessageIds": [
+    "msg-1792908752290-718",
+    "msg-1792909193797-664",
+    "msg-1792909808157-901",
+    "msg-1792911294333-725"
+  ]
 }

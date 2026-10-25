@@ -151,6 +151,10 @@ function sanitizeDb(data) {
   if (Array.isArray(clone.deletedCertificateIds) && clone.deletedCertificateIds.length > 0 && Array.isArray(clone.certificates)) {
     clone.certificates = clone.certificates.filter((c) => !clone.deletedCertificateIds.includes(c.id));
   }
+  if (Array.isArray(clone.deletedMessageIds) && clone.deletedMessageIds.length > 0 && Array.isArray(clone.messages)) {
+    const delMsgSet = new Set(clone.deletedMessageIds);
+    clone.messages = clone.messages.filter((m) => !delMsgSet.has(m.id));
+  }
   if (Array.isArray(clone.notifications)) {
     const deletedNotifSet = new Set(clone.deletedNotificationIds || []);
     const deduped = [];
@@ -257,9 +261,10 @@ export function AppProvider({ children }) {
         msgMap.set(m.id, existing ? { ...existing, ...m, read: Boolean(existing.read || m.read) } : m);
       }
     }
-    const mergedMessages = Array.from(msgMap.values()).sort(
-      (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
-    );
+    const delMsgSet = new Set([...(prev?.deletedMessageIds || []), ...(rawDb?.deletedMessageIds || [])]);
+    const mergedMessages = Array.from(msgMap.values())
+      .filter((m) => !delMsgSet.has(m.id))
+      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
 
     const mergedRaw = {
       ...rawDb,
@@ -281,7 +286,8 @@ export function AppProvider({ children }) {
       ),
       deletedCertificateIds: Array.from(
         new Set([...(prev?.deletedCertificateIds || []), ...(rawDb?.deletedCertificateIds || [])])
-      )
+      ),
+      deletedMessageIds: Array.from(delMsgSet)
     };
     const clean = sanitizeDb(mergedRaw);
     dbRef.current = clean;
@@ -292,13 +298,14 @@ export function AppProvider({ children }) {
     return clean;
   }
 
-  function applyServerMessages(serverMessages) {
-    if (!Array.isArray(serverMessages)) return;
+  function applyServerMessages(serverMessages, incomingDeletedIds = []) {
+    if (!Array.isArray(serverMessages) && !Array.isArray(incomingDeletedIds)) return;
     const prev = dbRef.current;
-    const prevMsgs = prev?.messages || [];
+    const delSet = new Set([...(prev?.deletedMessageIds || []), ...(incomingDeletedIds || [])]);
+    const prevMsgs = (prev?.messages || []).filter((m) => !delSet.has(m.id));
     const msgMap = new Map();
-    for (const m of [...prevMsgs, ...serverMessages]) {
-      if (m && m.id) {
+    for (const m of [...prevMsgs, ...(serverMessages || [])]) {
+      if (m && m.id && !delSet.has(m.id)) {
         const existing = msgMap.get(m.id);
         msgMap.set(m.id, existing ? { ...existing, ...m, read: Boolean(existing.read || m.read) } : m);
       }
@@ -307,8 +314,8 @@ export function AppProvider({ children }) {
       (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
     );
 
-    // If identical to prevMsgs, do nothing (prevent re-renders)
-    if (merged.length === prevMsgs.length) {
+    // If identical to prevMsgs and no new deleted ids, do nothing (prevent re-renders)
+    if (merged.length === prevMsgs.length && delSet.size === (prev?.deletedMessageIds || []).length) {
       let isIdentical = true;
       for (let i = 0; i < merged.length; i++) {
         if (merged[i].id !== prevMsgs[i].id || merged[i].read !== prevMsgs[i].read) {
@@ -319,7 +326,7 @@ export function AppProvider({ children }) {
       if (isIdentical) return;
     }
 
-    const nextDb = { ...prev, messages: merged };
+    const nextDb = { ...prev, messages: merged, deletedMessageIds: Array.from(delSet) };
     dbRef.current = nextDb;
     setDb(nextDb);
     try {
@@ -390,9 +397,17 @@ export function AppProvider({ children }) {
         eventSource.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data);
-            if (msg.type === 'NEW_CHAT_MESSAGE' || msg.type === 'MESSAGES_READ') {
+            if (
+              msg.type === 'NEW_CHAT_MESSAGE' ||
+              msg.type === 'MESSAGES_READ' ||
+              msg.type === 'MESSAGE_DELETED' ||
+              msg.type === 'CHAT_CLEARED'
+            ) {
               if (Array.isArray(msg.messages)) {
-                applyServerMessages(msg.messages);
+                applyServerMessages(
+                  msg.messages,
+                  msg.deletedMessageIds || (msg.messageId ? [msg.messageId] : msg.deletedIds || [])
+                );
               } else if (msg.message) {
                 applyServerMessages([msg.message]);
               }
@@ -429,7 +444,7 @@ export function AppProvider({ children }) {
                 if (chatRes.ok) {
                   const chatData = await chatRes.json();
                   if (chatData && Array.isArray(chatData.messages)) {
-                    applyServerMessages(chatData.messages);
+                    applyServerMessages(chatData.messages, chatData.deletedMessageIds || []);
                   }
                 }
               } catch {}
@@ -444,7 +459,7 @@ export function AppProvider({ children }) {
                 if (chatRes.ok) {
                   const chatData = await chatRes.json();
                   if (chatData && Array.isArray(chatData.messages)) {
-                    applyServerMessages(chatData.messages);
+                    applyServerMessages(chatData.messages, chatData.deletedMessageIds || []);
                   }
                 }
               } catch {}
@@ -2343,6 +2358,70 @@ export function AppProvider({ children }) {
     } catch {}
   }
 
+  function deleteChatMessage(messageId) {
+    if (!messageId) return;
+    const prev = dbRef.current;
+    const remaining = (prev?.messages || []).filter((m) => m.id !== messageId);
+    applyServerMessages(remaining, [messageId]);
+
+    try {
+      fetch('/api/chat/delete-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, userId: currentUser?.id })
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.messages)) {
+            applyServerMessages(data.messages, data.deletedMessageIds || [messageId]);
+          }
+        })
+        .catch(() => {});
+    } catch {}
+
+    showToast(lang === 'ru' ? 'Сообщение удалено' : "Xabar o'chirildi", 'info');
+  }
+
+  function clearChatThread(otherUserId) {
+    if (!currentUser || !otherUserId) return;
+    const isAdmin = currentUser.role === 'admin' || (currentUser.phone || '').replace(/\D/g, '') === ADMIN_PHONE_NORMALIZED;
+    const prev = dbRef.current;
+    const deletedIds = [];
+    const remaining = (prev?.messages || []).filter((m) => {
+      const isBetween =
+        (m.senderId === currentUser.id && (m.recipientId === otherUserId || (isAdmin && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin')))) ||
+        (m.recipientId === currentUser.id && (m.senderId === otherUserId || (isAdmin && (m.senderId === 'usr-admin-1' || m.senderRole === 'admin')))) ||
+        (isAdmin && (
+          (m.senderId === otherUserId && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin' || m.recipientId === currentUser.id)) ||
+          (m.recipientId === otherUserId && (m.senderId === 'usr-admin-1' || m.senderRole === 'admin' || m.senderId === currentUser.id))
+        ));
+      if (isBetween) {
+        deletedIds.push(m.id);
+        return false;
+      }
+      return true;
+    });
+
+    applyServerMessages(remaining, deletedIds);
+
+    try {
+      fetch('/api/chat/clear-thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id, otherUserId, isAdmin })
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.messages)) {
+            applyServerMessages(data.messages, data.deletedMessageIds || deletedIds);
+          }
+        })
+        .catch(() => {});
+    } catch {}
+
+    showToast(lang === 'ru' ? 'Чат очищен' : "Barcha xabarlar o'chirildi", 'info');
+  }
+
   function adminBroadcastMessage(text) {
     if (!currentUser || currentUser.role !== 'admin') return;
     const cleanText = (text || '').trim();
@@ -2685,6 +2764,8 @@ export function AppProvider({ children }) {
         applyServerMessages,
         sendChatMessage,
         markChatRead,
+        deleteChatMessage,
+        clearChatThread,
         adminBroadcastMessage,
         adminToggleCourseStatus,
         adminDeleteCourse,

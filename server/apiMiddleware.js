@@ -91,7 +91,12 @@ let messagesVersion = (globalThis.__codeCraftMessagesVersion = globalThis.__code
 
 export function notifyRealtimeClients(eventType = 'DB_SYNC', payload = {}) {
   currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
-  if (eventType === 'NEW_CHAT_MESSAGE' || eventType === 'MESSAGES_READ') {
+  if (
+    eventType === 'NEW_CHAT_MESSAGE' ||
+    eventType === 'MESSAGES_READ' ||
+    eventType === 'MESSAGE_DELETED' ||
+    eventType === 'CHAT_CLEARED'
+  ) {
     messagesVersion = globalThis.__codeCraftMessagesVersion = Date.now();
   }
   const dataString = JSON.stringify({ type: eventType, version: currentDbVersion, messagesVersion, ...payload });
@@ -640,9 +645,12 @@ export function createApiMiddleware() {
     // 0.12. GET /api/chat/messages — Fast chat messages fetch
     if (pathname === '/api/chat/messages' && req.method === 'GET') {
       const curDb = readDb();
+      const delSet = new Set(curDb.deletedMessageIds || []);
+      const activeMessages = (curDb.messages || []).filter((m) => !delSet.has(m.id));
       return sendJson(res, 200, {
         ok: true,
-        messages: curDb.messages || [],
+        messages: activeMessages,
+        deletedMessageIds: curDb.deletedMessageIds || [],
         messagesVersion,
         version: currentDbVersion
       });
@@ -671,6 +679,76 @@ export function createApiMiddleware() {
         return sendJson(res, 200, { ok: true, changed, messages: curDb.messages, messagesVersion });
       }
       return sendJson(res, 400, { error: 'Invalid mark-read payload' });
+    }
+
+    // 0.14. POST /api/chat/delete-message — Delete single message in real-time
+    if (pathname === '/api/chat/delete-message' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (body && body.messageId) {
+        const curDb = readDb();
+        curDb.messages = (curDb.messages || []).filter((m) => m.id !== body.messageId);
+        curDb.deletedMessageIds = Array.from(new Set([...(curDb.deletedMessageIds || []), body.messageId]));
+        messagesVersion = globalThis.__codeCraftMessagesVersion = Date.now();
+        currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
+        writeDb(curDb);
+        notifyRealtimeClients('MESSAGE_DELETED', {
+          messageId: body.messageId,
+          messages: curDb.messages,
+          deletedMessageIds: curDb.deletedMessageIds,
+          messagesVersion
+        });
+        return sendJson(res, 200, {
+          ok: true,
+          messageId: body.messageId,
+          messages: curDb.messages,
+          deletedMessageIds: curDb.deletedMessageIds,
+          messagesVersion
+        });
+      }
+      return sendJson(res, 400, { error: 'Invalid delete-message payload' });
+    }
+
+    // 0.15. POST /api/chat/clear-thread — Clear entire conversation thread in real-time
+    if (pathname === '/api/chat/clear-thread' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (body && body.userId && body.otherUserId) {
+        const curDb = readDb();
+        const deletedIds = [];
+        const isAdm = Boolean(body.isAdmin);
+        curDb.messages = (curDb.messages || []).filter((m) => {
+          const isThreadMessage =
+            (m.senderId === body.userId && (m.recipientId === body.otherUserId || (isAdm && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin')))) ||
+            (m.recipientId === body.userId && (m.senderId === body.otherUserId || (isAdm && (m.senderId === 'usr-admin-1' || m.senderRole === 'admin')))) ||
+            (isAdm && (
+              (m.senderId === body.otherUserId && (m.recipientId === 'usr-admin-1' || m.recipientName === 'admin' || m.recipientId === body.userId)) ||
+              (m.recipientId === body.otherUserId && (m.senderId === 'usr-admin-1' || m.senderRole === 'admin' || m.senderId === body.userId))
+            ));
+          if (isThreadMessage) {
+            deletedIds.push(m.id);
+            return false;
+          }
+          return true;
+        });
+        curDb.deletedMessageIds = Array.from(new Set([...(curDb.deletedMessageIds || []), ...deletedIds]));
+        messagesVersion = globalThis.__codeCraftMessagesVersion = Date.now();
+        currentDbVersion = globalThis.__codeCraftDbVersion = Date.now();
+        writeDb(curDb);
+        notifyRealtimeClients('CHAT_CLEARED', {
+          otherUserId: body.otherUserId,
+          deletedIds,
+          messages: curDb.messages,
+          deletedMessageIds: curDb.deletedMessageIds,
+          messagesVersion
+        });
+        return sendJson(res, 200, {
+          ok: true,
+          deletedIds,
+          messages: curDb.messages,
+          deletedMessageIds: curDb.deletedMessageIds,
+          messagesVersion
+        });
+      }
+      return sendJson(res, 400, { error: 'Invalid clear-thread payload' });
     }
 
     // 0.2. POST /api/media/upload & GET /api/media/:id — Cross-browser video upload & streaming
@@ -784,6 +862,9 @@ export function createApiMiddleware() {
         );
         const deletedCertificateIds = Array.from(
           new Set([...(db.deletedCertificateIds || []), ...(incoming.deletedCertificateIds || [])])
+        );
+        const deletedMessageIds = Array.from(
+          new Set([...(db.deletedMessageIds || []), ...(incoming.deletedMessageIds || [])])
         );
 
         // Smart merge users (preserve users registered across different browsers)
@@ -914,10 +995,10 @@ export function createApiMiddleware() {
         }
         const mergedCertificates = Array.from(certMap.values());
 
-        // Smart merge messages (preserve all messages between students and admin across devices)
+        // Smart merge messages (preserve all messages between students and admin across devices, excluding deleted)
         const msgMap = new Map();
         for (const m of [...(db.messages || []), ...(incoming.messages || [])]) {
-          if (m && m.id) {
+          if (m && m.id && !deletedMessageIds.includes(m.id)) {
             const existing = msgMap.get(m.id);
             msgMap.set(m.id, existing ? { ...existing, ...m, read: Boolean(existing.read || m.read) } : m);
           }
@@ -943,7 +1024,8 @@ export function createApiMiddleware() {
           deletedPaymentIds,
           deletedUserIds,
           deletedNotificationIds,
-          deletedCertificateIds
+          deletedCertificateIds,
+          deletedMessageIds
         };
         writeDb(nextDb);
         const safeUsers = nextDb.users.map(({ passwordHash: _passwordHash, ...u }) => u);
