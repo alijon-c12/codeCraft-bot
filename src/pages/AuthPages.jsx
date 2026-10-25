@@ -6,43 +6,240 @@ export function AuthPage({ mode = 'login' }) {
     t,
     formatPrice,
     db,
-    loginWithPhone,
-    createPendingPayment,
-    validateReceiptImage,
-    enrollInAllCourses,
+    login,
     register,
     resetPassword,
-    quickDemoLogin,
+    createPendingPayment,
+    validateReceiptImage,
     navigate,
     route,
     showToast,
     lang,
     adminCardNumber,
-    adminCardHolder,
-    getPaymeUrl,
-    getClickUrl,
-    getClickTelegramUrl
+    adminCardHolder
   } = useApp();
+
+  const [activeTab, setActiveTab] = useState(
+    mode === 'register' ? 'register' : mode === 'reset' ? 'reset' : 'login'
+  );
+
+  useEffect(() => {
+    if (mode === 'register' || mode === 'reset' || mode === 'login') {
+      setActiveTab(mode);
+    }
+  }, [mode]);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+998');
   const [phoneError, setPhoneError] = useState('');
-  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // SMS Verification State for login
-  const [smsStep, setSmsStep] = useState(false);
-  const [smsInput, setSmsInput] = useState('');
-  const [countdown, setCountdown] = useState(0);
-
-  // Step 3: Registration Course Package Payment State
+  // Registration Course Package Payment State
   const [paymentStep, setPaymentStep] = useState(false);
   const [verifiedUser, setVerifiedUser] = useState(null);
   const [bundleReceiptImage, setBundleReceiptImage] = useState('');
   const [bundleReceiptError, setBundleReceiptError] = useState('');
   const [isPayingBundle, setIsPayingBundle] = useState(false);
+
+  const bundlePrice = 100000;
+  const PHONE_START_REGEX = /^\+998/;
+  const PHONE_REGEX = /^\+998[\s-]?(\(?[0-9]{2}\)?[\s-]?[0-9]{3}[\s-]?[0-9]{2}[\s-]?[0-9]{2}|[0-9]{9})$/;
+
+  function validatePhoneNumber(value) {
+    const trimmed = (value || '').trim();
+    if (!trimmed || !PHONE_START_REGEX.test(trimmed)) {
+      return (
+        t.auth.errors?.phoneReq ||
+        (lang === 'ru' ? 'Вы должны ввести номер телефона' : 'Siz bu yerga telefon raqam kiritishingiz kerak')
+      );
+    }
+    const hasLettersOrSymbols = /[a-zA-Zа-яА-ЯёЁ!@#$%^&*_={}[\]<>]/.test(trimmed);
+    const isValid = PHONE_REGEX.test(trimmed) && !hasLettersOrSymbols;
+    if (!isValid) {
+      return (
+        t.auth.errors?.phoneReq ||
+        (lang === 'ru' ? 'Неверный формат номера телефона (+998)' : "Telefon raqami formati noto'g'ri (+998)")
+      );
+    }
+    return '';
+  }
+
+  function handlePhoneChange(e) {
+    let val = e.target.value;
+    if (!PHONE_START_REGEX.test(val)) {
+      val = '+998' + val.replace(/^\+?9?9?8?/, '');
+    }
+    setPhone(val);
+    setError('');
+    if (val !== '+998') {
+      const err = validatePhoneNumber(val);
+      setPhoneError(err);
+    } else {
+      setPhoneError('');
+    }
+  }
+
+  async function handleLoginSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    setError('');
+
+    const pErr = validatePhoneNumber(phone);
+    if (pErr) {
+      setPhoneError(pErr);
+      setError(pErr);
+      return;
+    }
+
+    if (!password) {
+      setError(lang === 'ru' ? 'Введите пароль' : 'Parolni kiriting');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = login(phone.trim(), password);
+      if (!res.ok) {
+        setError(res.error || t.auth.errors.invalidCreds);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(t.auth.errors.invalidCreds);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegisterSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    setError('');
+
+    if (name.trim().length < 3) {
+      setError(t.auth.errors.nameMin);
+      return;
+    }
+
+    const pErr = validatePhoneNumber(phone);
+    if (pErr) {
+      setPhoneError(pErr);
+      setError(pErr);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError(t.auth.errors.passwordMin);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError(t.auth.errors.passwordMatch);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const isAdm = phone.replace(/\D/g, '') === '998951639101';
+      // Register with skipRedirect=true so if student, we can offer the bundle payment step
+      const res = register({
+        name: name.trim(),
+        phone: phone.trim(),
+        password: password,
+        skipRedirect: true
+      });
+
+      if (!res.ok) {
+        setError(res.error || (lang === 'ru' ? 'Ошибка регистрации' : "Ro'yxatdan o'tishda xatolik"));
+        setLoading(false);
+        return;
+      }
+
+      if (isAdm || res.user?.role === 'admin') {
+        navigate('admin');
+        return;
+      }
+
+      // Check if student already has all courses
+      const alreadyHasAll = (db.enrollments || []).some(
+        (en) => en.userId === res.user?.id && (en.courseId === 'all' || (db.courses || []).some((c) => c.id === en.courseId))
+      );
+
+      if (alreadyHasAll) {
+        navigate('courses');
+        return;
+      }
+
+      // Open optional bundle payment step
+      setVerifiedUser(res.user);
+      setPaymentStep(true);
+    } catch (err) {
+      console.error('Register error:', err);
+      setError(lang === 'ru' ? 'Ошибка регистрации' : "Ro'yxatdan o'tishda xatolik");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResetSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    setError('');
+
+    const pErr = validatePhoneNumber(phone);
+    if (pErr) {
+      setPhoneError(pErr);
+      setError(pErr);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError(t.auth.errors.passwordMin);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError(t.auth.errors.passwordMatch);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = resetPassword({
+        phone: phone.trim(),
+        newPassword: password
+      });
+
+      if (!res.ok) {
+        setError(res.error || (lang === 'ru' ? 'Пользователь не найден' : 'Foydalanuvchi topilmadi'));
+      } else {
+        showToast(
+          lang === 'ru' ? 'Пароль успешно обновлён! Войдите с новым паролем.' : "Parol muvaffaqiyatli yangilandi! Yangi parol bilan kiring.",
+          'success'
+        );
+        setActiveTab('login');
+        setPassword('');
+        setConfirmPassword('');
+      }
+    } catch (err) {
+      console.error('Reset password error:', err);
+      setError(lang === 'ru' ? 'Ошибка при сбросе пароля' : 'Parolni yangilashda xatolik');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleQuickAdminFill() {
+    setPhone('+998 95 163 91 01');
+    setPassword('admin123');
+    setPhoneError('');
+    setError('');
+    setActiveTab('login');
+    showToast(
+      lang === 'ru' ? 'Данные администратора подставлены!' : "Bosh administrator ma'lumotlari kiritildi!",
+      'info'
+    );
+  }
 
   function handleBundleReceiptFileChange(e) {
     const file = e.target.files?.[0];
@@ -76,162 +273,6 @@ export function AuthPage({ mode = 'login' }) {
     reader.readAsDataURL(file);
   }
 
-  const allCourses = db.courses || [];
-  const bundlePrice = 100000;
-
-  const PHONE_START_REGEX = /^\+998/;
-  const PHONE_REGEX = /^\+998[\s-]?(\(?[0-9]{2}\)?[\s-]?[0-9]{3}[\s-]?[0-9]{2}[\s-]?[0-9]{2}|[0-9]{9})$/;
-
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setInterval(() => {
-      setCountdown((c) => c - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
-
-  function validatePhoneNumber(value) {
-    const trimmed = (value || '').trim();
-    if (!trimmed || !PHONE_START_REGEX.test(trimmed)) {
-      return t.auth.errors.phoneReq || (lang === 'ru' ? 'Вы должны ввести номер телефона' : 'Siz bu yerga telefon raqam kiritishingiz kerak');
-    }
-    const hasLettersOrSymbols = /[a-zA-Zа-яА-ЯёЁ!@#$%^&*_={}[\]<>]/.test(trimmed);
-    const isValid = PHONE_REGEX.test(trimmed) && !hasLettersOrSymbols;
-    if (!isValid) {
-      return t.auth.errors.phoneReq || (lang === 'ru' ? 'Вы должны ввести номер телефона' : 'Siz bu yerga telefon raqam kiritishingiz kerak');
-    }
-    return '';
-  }
-
-  const [loading, setLoading] = useState(false);
-
-  async function handleSendSmsCode(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    setError('');
-
-    if (name.trim().length < 3) {
-      setError(t.auth.errors.nameMin);
-      return;
-    }
-
-    const pErr = validatePhoneNumber(phone);
-    if (pErr) {
-      setPhoneError(pErr);
-      setError(pErr);
-      return;
-    }
-    setPhoneError('');
-    setLoading(true);
-
-    try {
-      // Backend SMS Gateway: To'g'ridan-to'g'ri telefon raqamiga SMS yuborish
-      const res = await fetch('/api/auth/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: phone.trim(),
-          name: name.trim()
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || (lang === 'ru' ? 'Ошибка отправки SMS' : 'SMS yuborishda xatolik yuz berdi'));
-        setLoading(false);
-        return;
-      }
-
-      setSmsStep(true);
-      setCountdown(60);
-
-      const toastMsg = lang === 'ru'
-        ? `✅ SMS с кодом отправлено на номер ${phone}!`
-        : `✅ Tasdiqlash kodi ${phone} raqamiga SMS orqali yuborildi!`;
-      showToast(toastMsg, 'success');
-      if (data.devCode) {
-        showToast(`Tasdiqlash kodi: ${data.devCode}`, 'info');
-      }
-    } catch (err) {
-      console.error('Send SMS error:', err);
-      // Fallback
-      setSmsStep(true);
-      setCountdown(60);
-      showToast(
-        lang === 'ru'
-          ? `✅ SMS с кодом отправлено на номер ${phone}!`
-          : `✅ Tasdiqlash kodi ${phone} raqamiga SMS orqali yuborildi!`,
-        'success'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleVerifySmsAndLogin(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    setError('');
-
-    const input = (smsInput || '').trim();
-    if (!input) {
-      setError(t.auth.errors.invalidSmsCode);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Backend API: SMS kodni tekshirish
-      const res = await fetch('/api/auth/verify-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: phone.trim(),
-          code: input,
-          name: name.trim()
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || t.auth.errors.invalidSmsCode);
-        setLoading(false);
-        return;
-      }
-
-      const isAdmin = (phone || '').replace(/\D/g, '') === '998951639101' || data.user?.role === 'admin';
-      if (isAdmin) {
-        const loginRes = loginWithPhone({ name, phone, user: data.user });
-        if (!loginRes.ok) setError(loginRes.error);
-        return;
-      }
-
-      // Talaba avvalroq to'liq kurslar to'plamini sotib olganmi tekshirish
-      const alreadyHasAll = (db.enrollments || []).some(
-        (e) => e.userId === data.user?.id && (e.courseId === 'all' || (db.courses || []).some((c) => c.id === e.courseId))
-      );
-
-      if (alreadyHasAll) {
-        const loginRes = loginWithPhone({ name, phone, user: data.user });
-        if (!loginRes.ok) setError(loginRes.error);
-        return;
-      }
-
-      // Yangi ro'yxatdan o'tayotgan talaba: 3-qadam Umumiy kurslarni sotib olish oynasini ochish
-      loginWithPhone({ name, phone, user: data.user, skipRedirect: true });
-      setVerifiedUser(data.user);
-      setBundleCardHolder((data.user?.name || name || 'TALABA').toUpperCase());
-      setBundleClickPhone(data.user?.phone || phone || '+998 90 123 45 67');
-      setPaymentStep(true);
-    } catch (err) {
-      console.error('Verify SMS error:', err);
-      setError(t.auth.errors.invalidSmsCode);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function handlePayBundle() {
     if (!bundleReceiptImage) {
       setBundleReceiptError(
@@ -253,7 +294,6 @@ export function AuthPage({ mode = 'login' }) {
       const uId = verifiedUser?.id;
       const mask = (adminCardNumber || '8600 4912 8301 7724').trim();
 
-      // Kurs faqat admin kartaga pul tushganini tasdiqlaganidan keyin ochiladi
       if (uId && createPendingPayment) {
         createPendingPayment({
           courseId: 'all',
@@ -291,17 +331,467 @@ export function AuthPage({ mode = 'login' }) {
       <div className="container narrow-container">
         <div className="auth-card">
           <div className="auth-brand-badge">⚡</div>
-          {!paymentStep && (
-            <div className="auth-header">
-              <h1>{smsStep ? t.auth.smsSentTitle : t.auth.loginTitle}</h1>
-              <p>{smsStep ? `${phone} ${t.auth.smsSentSub}` : t.auth.loginSub}</p>
-            </div>
-          )}
 
-          {error && <div className="alert-error">⚠️ {error}</div>}
+          {!paymentStep ? (
+            <>
+              {/* TAB SELECTOR: KIRISH / RO'YXATDAN O'TISH */}
+              <div
+                style={{
+                  display: 'flex',
+                  background: 'var(--bg-alt, rgba(0,0,0,0.04))',
+                  padding: '4px',
+                  borderRadius: '12px',
+                  marginBottom: '20px',
+                  gap: '4px'
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.92rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: activeTab === 'login' ? 'var(--primary)' : 'transparent',
+                    color: activeTab === 'login' ? '#fff' : 'var(--text-muted)'
+                  }}
+                  onClick={() => {
+                    setActiveTab('login');
+                    setError('');
+                  }}
+                >
+                  🔑 {t.auth.loginBtn || (lang === 'ru' ? 'Вход' : 'Kirish')}
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.92rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: activeTab === 'register' ? 'var(--primary)' : 'transparent',
+                    color: activeTab === 'register' ? '#fff' : 'var(--text-muted)'
+                  }}
+                  onClick={() => {
+                    setActiveTab('register');
+                    setError('');
+                  }}
+                >
+                  📝 {t.auth.registerBtn || (lang === 'ru' ? 'Регистрация' : "Ro'yxatdan o'tish")}
+                </button>
+              </div>
 
-          {/* 3-QADAM: ROYHATDAN O'TAYOTGANDA UMUMIY KURSLARNI SOTIB OLISH */}
-          {paymentStep ? (
+              <div className="auth-header">
+                <h1>
+                  {activeTab === 'login'
+                    ? t.auth.loginTitle
+                    : activeTab === 'register'
+                    ? t.auth.registerTitle
+                    : t.auth.resetTitle}
+                </h1>
+                <p>
+                  {activeTab === 'login'
+                    ? t.auth.loginSub
+                    : activeTab === 'register'
+                    ? t.auth.registerSub
+                    : t.auth.resetSub}
+                </p>
+              </div>
+
+              {error && <div className="alert-error">⚠️ {error}</div>}
+
+              {/* 1. LOGIN FORM */}
+              {activeTab === 'login' && (
+                <form className="auth-form" onSubmit={handleLoginSubmit} noValidate>
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>📱</span>
+                      <span>{t.auth.loginPhoneLabel || (lang === 'ru' ? 'Номер телефона' : 'Telefon raqam')}</span>
+                    </label>
+                    <input
+                      type="tel"
+                      className={`input ${phoneError ? 'input-error' : ''}`}
+                      style={phoneError ? { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.04)' } : {}}
+                      placeholder="+998 95 163 91 01"
+                      value={phone}
+                      onChange={handlePhoneChange}
+                      required
+                    />
+                    {phoneError && (
+                      <span
+                        style={{
+                          color: '#ef4444',
+                          fontSize: '0.84rem',
+                          marginTop: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        ⚠️ {phoneError}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label className="field-label" style={{ margin: 0 }}>
+                        <span>🔒</span>
+                        <span>{t.auth.passwordLabel || (lang === 'ru' ? 'Пароль' : 'Parol')}</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-link"
+                        style={{ fontSize: '0.82rem' }}
+                        onClick={() => {
+                          setActiveTab('reset');
+                          setError('');
+                        }}
+                      >
+                        {t.auth.forgotPassword || (lang === 'ru' ? 'Забыли пароль?' : 'Parolni unutdingizmi?')}
+                      </button>
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="input"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError('');
+                        }}
+                        style={{ paddingRight: '40px' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1.1rem',
+                          padding: '4px'
+                        }}
+                        title={showPassword ? 'Yashirish' : "Ko'rsatish"}
+                      >
+                        {showPassword ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary btn-block btn-lg btn-auth-submit"
+                  >
+                    {loading
+                      ? (lang === 'ru' ? '⏳ Вход в систему...' : '⏳ Tizimga kirilmoqda...')
+                      : `🚀 ${t.auth.loginBtn || (lang === 'ru' ? 'Войти' : 'Tizimga kirish')}`}
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '14px', fontSize: '0.88rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {t.auth.noAccount || (lang === 'ru' ? 'Нет аккаунта?' : "Hisobingiz yo'qmi?")}{' '}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-link"
+                      style={{ fontWeight: 700 }}
+                      onClick={() => {
+                        setActiveTab('register');
+                        setError('');
+                      }}
+                    >
+                      {t.auth.registerBtn || (lang === 'ru' ? 'Зарегистрироваться' : "Ro'yxatdan o'tish")}
+                    </button>
+                  </div>
+
+                  {/* ADMIN HISOB TEZKOR MA'LUMOTI */}
+                  <div
+                    style={{
+                      marginTop: '20px',
+                      padding: '12px 14px',
+                      background: 'rgba(99, 102, 241, 0.08)',
+                      border: '1px dashed rgba(99, 102, 241, 0.35)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px',
+                      fontSize: '0.84rem'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                        👑 {lang === 'ru' ? 'Вход для Администратора' : 'Bosh Administrator kirishi'}:
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
+                        📞 <strong>+998 95 163 91 01</strong> | 🔑 <strong>admin123</strong>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={handleQuickAdminFill}
+                      style={{ whiteSpace: 'nowrap', padding: '6px 10px', fontSize: '0.78rem' }}
+                    >
+                      ⚡ {lang === 'ru' ? 'Вставить' : "To'ldirish"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* 2. REGISTER FORM */}
+              {activeTab === 'register' && (
+                <form className="auth-form" onSubmit={handleRegisterSubmit} noValidate>
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>👤</span>
+                      <span>{t.auth.loginNameLabel || (lang === 'ru' ? 'Имя и фамилия' : 'Ism familiya')}</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder={t.auth.loginNamePlaceholder || (lang === 'ru' ? 'Введите имя и фамилию' : 'Ism familiya kiriting')}
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        setError('');
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>📱</span>
+                      <span>{t.auth.loginPhoneLabel || (lang === 'ru' ? 'Номер телефона' : 'Telefon raqam')}</span>
+                    </label>
+                    <input
+                      type="tel"
+                      className={`input ${phoneError ? 'input-error' : ''}`}
+                      style={phoneError ? { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.04)' } : {}}
+                      placeholder="+998 90 123 45 67"
+                      value={phone}
+                      onChange={handlePhoneChange}
+                      required
+                    />
+                    {phoneError && (
+                      <span
+                        style={{
+                          color: '#ef4444',
+                          fontSize: '0.84rem',
+                          marginTop: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        ⚠️ {phoneError}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>🔒</span>
+                      <span>{lang === 'ru' ? 'Создайте пароль (минимум 6 символов)' : "Parol yarating (kamida 6 ta belgi)"}</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="input"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setError('');
+                        }}
+                        style={{ paddingRight: '40px' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '1.1rem',
+                          padding: '4px'
+                        }}
+                        title={showPassword ? 'Yashirish' : "Ko'rsatish"}
+                      >
+                        {showPassword ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>🛡️</span>
+                      <span>{t.auth.confirmPasswordLabel || (lang === 'ru' ? 'Подтвердите пароль' : 'Parolni tasdiqlang')}</span>
+                    </label>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      className="input"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setError('');
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary btn-block btn-lg btn-auth-submit"
+                  >
+                    {loading
+                      ? (lang === 'ru' ? '⏳ Регистрация...' : "⏳ Ro'yxatdan o'tilmoqda...")
+                      : `✨ ${t.auth.registerBtn || (lang === 'ru' ? 'Зарегистрироваться' : "Ro'yxatdan o'tish")}`}
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '14px', fontSize: '0.88rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {t.auth.hasAccount || (lang === 'ru' ? 'Уже есть аккаунт?' : 'Allaqachon hisobingiz bormi?')}{' '}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-link"
+                      style={{ fontWeight: 700 }}
+                      onClick={() => {
+                        setActiveTab('login');
+                        setError('');
+                      }}
+                    >
+                      {t.auth.loginBtn || (lang === 'ru' ? 'Войти' : 'Kirish')}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* 3. RESET PASSWORD FORM */}
+              {activeTab === 'reset' && (
+                <form className="auth-form" onSubmit={handleResetSubmit} noValidate>
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>📱</span>
+                      <span>{t.auth.loginPhoneLabel || (lang === 'ru' ? 'Номер телефона' : 'Telefon raqam')}</span>
+                    </label>
+                    <input
+                      type="tel"
+                      className={`input ${phoneError ? 'input-error' : ''}`}
+                      style={phoneError ? { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.04)' } : {}}
+                      placeholder="+998 90 123 45 67"
+                      value={phone}
+                      onChange={handlePhoneChange}
+                      required
+                    />
+                    {phoneError && (
+                      <span
+                        style={{
+                          color: '#ef4444',
+                          fontSize: '0.84rem',
+                          marginTop: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        ⚠️ {phoneError}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>🔒</span>
+                      <span>{lang === 'ru' ? 'Новый пароль (минимум 6 символов)' : 'Yangi parol (kamida 6 ta belgi)'}</span>
+                    </label>
+                    <input
+                      type="password"
+                      className="input"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError('');
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="field-label">
+                      <span>🛡️</span>
+                      <span>{lang === 'ru' ? 'Подтвердите новый пароль' : 'Yangi parolni tasdiqlang'}</span>
+                    </label>
+                    <input
+                      type="password"
+                      className="input"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setError('');
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary btn-block btn-lg btn-auth-submit"
+                  >
+                    {loading
+                      ? (lang === 'ru' ? '⏳ Обновление...' : '⏳ Yangilanmoqda...')
+                      : `🔄 ${t.auth.resetBtn || (lang === 'ru' ? 'Обновить пароль' : 'Parolni yangilash')}`}
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '14px', fontSize: '0.88rem' }}>
+                    <button
+                      type="button"
+                      className="text-link"
+                      onClick={() => {
+                        setActiveTab('login');
+                        setError('');
+                      }}
+                    >
+                      ← {lang === 'ru' ? 'Вернуться ко входу' : 'Kirish sahifasiga qaytish'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          ) : (
+            /* STEP 2: ROYHATDAN O'TGANDAN SO'NG UMUMIY KURSLARNI SOTIB OLISH */
             <div className="registration-bundle-flow">
               <div
                 style={{
@@ -321,8 +811,8 @@ export function AuthPage({ mode = 'login' }) {
                 <span>✅</span>
                 <span>
                   {lang === 'ru'
-                    ? 'Шаг 1 завершён: Телефон успешно подтверждён!'
-                    : "1-qadam yakunlandi: Telefon raqam muvaffaqiyatli tasdiqlandi!"}
+                    ? 'Аккаунт успешно создан!'
+                    : "Hisobingiz muvaffaqiyatli yaratildi!"}
                 </span>
               </div>
 
@@ -407,7 +897,7 @@ export function AuthPage({ mode = 'login' }) {
 
                 <div style={{ marginBottom: '12px' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
-                    {lang === 'ru' ? 'Номер карты для перевода:' : 'To\'lov uchun karta raqami:'}
+                    {lang === 'ru' ? 'Номер карты для перевода:' : "To'lov uchun karta raqami:"}
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <code
@@ -459,7 +949,7 @@ export function AuthPage({ mode = 'login' }) {
                 </div>
               </div>
 
-              {/* 2. TO'LOV CHEKINI YUKLASH (MAJBURIY) */}
+              {/* 2. TO'LOV CHEKINI YUKLASH */}
               <div
                 style={{
                   background: bundleReceiptImage ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-alt)',
@@ -619,7 +1109,6 @@ export function AuthPage({ mode = 'login' }) {
                   </small>
                 )}
 
-                {/* 3. KEYINROQ TO'LASH */}
                 <button
                   type="button"
                   className="btn btn-ghost btn-block"
@@ -630,186 +1119,6 @@ export function AuthPage({ mode = 'login' }) {
                 </button>
               </div>
             </div>
-          ) : !smsStep ? (
-            /* STEP 1: ISM FAMILIYA & TELEFON RAQAM */
-            <form className="auth-form" onSubmit={handleSendSmsCode} noValidate>
-              <div className="form-group">
-                <label className="field-label">
-                  <span>👤</span>
-                  <span>{t.auth.loginNameLabel}</span>
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder={t.auth.loginNamePlaceholder}
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    setError('');
-                  }}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">
-                  <span>📱</span>
-                  <span>{t.auth.loginPhoneLabel}</span>
-                </label>
-                <input
-                  type="tel"
-                  className={`input ${phoneError ? 'input-error' : ''}`}
-                  style={phoneError ? { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.04)' } : {}}
-                  placeholder={t.auth.loginPhonePlaceholder}
-                  value={phone}
-                  onChange={(e) => {
-                    let val = e.target.value;
-                    if (!PHONE_START_REGEX.test(val)) {
-                      val = '+998' + val.replace(/^\+?9?9?8?/, '');
-                    }
-                    setPhone(val);
-                    setError('');
-                    if (val !== '+998') {
-                      const err = validatePhoneNumber(val);
-                      setPhoneError(err);
-                    } else {
-                      setPhoneError('');
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value !== '+998') {
-                      const err = validatePhoneNumber(e.target.value);
-                      setPhoneError(err);
-                    }
-                  }}
-                  required
-                />
-                {phoneError && (
-                  <span
-                    style={{
-                      color: '#ef4444',
-                      fontSize: '0.84rem',
-                      marginTop: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontWeight: '500'
-                    }}
-                  >
-                    ⚠️ {phoneError}
-                  </span>
-                )}
-              </div>
-
-              <button type="submit" disabled={loading} className="btn btn-primary btn-block btn-lg btn-auth-submit">
-                {loading ? (lang === 'ru' ? '⏳ Отправка SMS...' : '⏳ SMS yuborilmoqda...') : `📨 ${t.auth.getSmsCodeBtn}`}
-              </button>
-
-              <div className="auth-trust-note">
-                <span>🔒</span>
-                <span>
-                  {lang === 'ru'
-                    ? 'Безопасная авторизация через SMS'
-                    : "SMS orqali xavfsiz avtorizatsiya"}
-                </span>
-              </div>
-            </form>
-          ) : (
-            /* STEP 2: SMS TASDIQLASH KODI */
-            <form className="auth-form" onSubmit={handleVerifySmsAndLogin} noValidate>
-              {/* SMS status notice */}
-              <div
-                style={{
-                  background: 'rgba(56, 189, 248, 0.08)',
-                  border: '1px solid rgba(56, 189, 248, 0.25)',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  marginBottom: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '1.4rem' }}>📱</span>
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '0.92rem', color: 'var(--text)' }}>
-                      {lang === 'ru'
-                        ? 'SMS отправлено на ваш номер:'
-                        : 'SMS telefon raqamingizga yuborildi:'}
-                    </div>
-                    <div style={{ fontSize: '0.95rem', color: '#38bdf8', fontWeight: '700' }}>
-                      {phone}
-                    </div>
-                  </div>
-                </div>
-                <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
-                  {lang === 'ru'
-                    ? 'Пожалуйста, проверьте входящие SMS или нашего официального Telegram-бота '
-                    : "Iltimos, telefoningizdagi SMS xabarlarni yoki rasmiy Telegram botimiz "}
-                  <a
-                    href="https://t.me/CodeCraftUzBot?start=login"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: '#38bdf8', fontWeight: '700', textDecoration: 'underline' }}
-                  >
-                    @CodeCraftUzBot
-                  </a>
-                  {lang === 'ru'
-                    ? ' и введите полученный 4-значный код:'
-                    : " ni tekshiring va kelgan 4 xonali tasdiqlash kodini kiriting:"}
-                </p>
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">{t.auth.smsCodeLabel}</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  className="input"
-                  style={{
-                    fontSize: '1.45rem',
-                    letterSpacing: '8px',
-                    textAlign: 'center',
-                    fontWeight: '700',
-                    padding: '10px'
-                  }}
-                  placeholder="••••"
-                  value={smsInput}
-                  onChange={(e) => {
-                    setSmsInput(e.target.value.replace(/\D/g, ''));
-                    setError('');
-                  }}
-                  autoFocus
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 16px', fontSize: '0.88rem' }}>
-                <button
-                  type="button"
-                  className="text-link"
-                  onClick={() => {
-                    setSmsStep(false);
-                    setError('');
-                  }}
-                >
-                  ✏️ {t.auth.changePhone}
-                </button>
-                <button
-                  type="button"
-                  className="text-link"
-                  disabled={countdown > 0}
-                  onClick={handleSendSmsCode}
-                  style={{ cursor: countdown > 0 ? 'not-allowed' : 'pointer', opacity: countdown > 0 ? 0.6 : 1 }}
-                >
-                  🔄 {countdown > 0 ? `${t.auth.resendCodeIn} (${countdown}s)` : t.auth.resendCode}
-                </button>
-              </div>
-
-              <button type="submit" disabled={loading} className="btn btn-primary btn-block btn-lg">
-                {loading ? (lang === 'ru' ? '⏳ Проверка кода...' : '⏳ Kod tekshirilmoqda...') : `🚀 ${t.auth.verifyAndLoginBtn}`}
-              </button>
-            </form>
           )}
         </div>
       </div>

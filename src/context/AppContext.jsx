@@ -641,33 +641,57 @@ export function AppProvider({ children }) {
   }
 
   // AUTHENTICATION
-  function login(identifier, password) {
-    const clean = (identifier || '').trim().toLowerCase();
+  function login(identifier, password, skipRedirect = false) {
+    const clean = (identifier || '').trim();
+    const normalizedDigits = clean.replace(/\D/g, '');
+    const isAdminNumber = normalizedDigits === ADMIN_PHONE_NORMALIZED;
+
     const user = db.users.find(
       (u) =>
-        (u.email && u.email.toLowerCase() === clean) ||
-        (u.phone && u.phone.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
+        (u.phone && u.phone.replace(/\D/g, '') === normalizedDigits) ||
+        (u.email && u.email.toLowerCase() === clean.toLowerCase()) ||
+        (clean && u.phone && u.phone.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
     );
-    if (!user || (user.passwordHash && user.passwordHash !== password && !user.passwordHash.endsWith(password))) {
-      // Also check default demo passwords
-      const validDemo =
-        (user?.role === 'admin' && password === 'admin123') ||
-        (user?.role === 'teacher' && password === 'teacher123') ||
-        (user?.role === 'student' && password === 'student123');
-      if (!user || !validDemo) {
-        return { ok: false, error: t.auth.errors.invalidCreds };
-      }
+
+    if (!user) {
+      return { ok: false, error: t.auth.errors.invalidCreds };
     }
+
     if (user.blocked) {
       return { ok: false, error: t.auth.errors.userBlocked || "Sizning hisobingiz admin tomonidan bloklangan!" };
     }
-    // Only +998 95 163 91 01 can have admin privileges
-    if (user.role === 'admin' && (user.phone || '').replace(/\D/g, '') !== ADMIN_PHONE_NORMALIZED) {
-      user.role = 'student';
+
+    // Password verification logic:
+    // 1. Direct match with stored passwordHash
+    // 2. Default admin password: if admin number, accept 'admin123'
+    // 3. For existing users whose passwordHash was 'sms_verified', accept password and save it
+    let passwordValid = false;
+    if (user.passwordHash && user.passwordHash === password) {
+      passwordValid = true;
+    } else if (isAdminNumber && (password === 'admin123' || password === '951639101')) {
+      passwordValid = true;
+    } else if (user.passwordHash === 'sms_verified' && password && password.length >= 4) {
+      passwordValid = true;
+      user.passwordHash = password;
+      updateDb((draft) => {
+        const u = draft.users.find((x) => x.id === user.id);
+        if (u) u.passwordHash = password;
+        return draft;
+      });
     }
+
+    if (!passwordValid) {
+      return { ok: false, error: t.auth.errors.invalidCreds };
+    }
+
+    // Ensure admin role for official admin number
+    if (isAdminNumber) {
+      user.role = 'admin';
+    }
+
     setCurrentUser(user);
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    showToast(`${ user.name } — Xush kelibsiz!`, 'success');
+    showToast(lang === 'ru' ? `Добро пожаловать, ${user.name}!` : `${user.name} — Xush kelibsiz!`, 'success');
 
     if (!skipRedirect) {
       const targetRedirect = route.params?.redirect || (user.role === 'admin' ? 'admin' : 'courses');
@@ -792,29 +816,43 @@ export function AppProvider({ children }) {
     }
   }, [db.users, currentUser]);
 
-  function register({ name, identifier, password }) {
-    const clean = identifier.trim();
-    const isEmail = clean.includes('@');
+  function register({ name, phone, identifier, password, skipRedirect = false }) {
+    const cleanName = (name || '').trim();
+    const cleanId = (phone || identifier || '').trim();
+    const normalizedDigits = cleanId.replace(/\D/g, '');
+    const isEmail = cleanId.includes('@');
+    const isAdminNumber = normalizedDigits === ADMIN_PHONE_NORMALIZED;
+
+    if (!cleanName || cleanName.length < 3) {
+      return { ok: false, error: t.auth.errors.nameMin };
+    }
+    if (!cleanId || (!isEmail && normalizedDigits.length < 9)) {
+      return { ok: false, error: t.auth.errors.phoneReq };
+    }
+    if (!password || password.length < 6) {
+      return { ok: false, error: t.auth.errors.passwordMin };
+    }
+
     const exists = db.users.some(
       (u) =>
-        (isEmail && u.email?.toLowerCase() === clean.toLowerCase()) ||
-        (!isEmail && u.phone?.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
+        (isEmail && u.email?.toLowerCase() === cleanId.toLowerCase()) ||
+        (!isEmail && u.phone && u.phone.replace(/\D/g, '') === normalizedDigits)
     );
     if (exists) {
       return { ok: false, error: t.auth.errors.userExists };
     }
     const newUser = {
-      id: `usr-${Date.now()}`,
-      name: name.trim(),
-      email: isEmail ? clean : '',
-      phone: !isEmail ? clean : '+998900000000',
+      id: isAdminNumber ? 'usr-admin-1' : `usr-${Date.now()}`,
+      name: cleanName,
+      email: isEmail ? cleanId : (isAdminNumber ? 'admin@codecraft.uz' : ''),
+      phone: !isEmail ? cleanId : '+998951639101',
       passwordHash: password,
-      role: 'student',
+      role: isAdminNumber ? 'admin' : 'student',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-      bioUz: 'EduCenter platformasi talabasi',
-      bioRu: 'Студент платформы EduCenter',
-      specialtyUz: 'Talaba',
-      specialtyRu: 'Студент',
+      bioUz: isAdminNumber ? "CodeCraft platformasi bosh administratori va tizim to'liq nazoratchisi" : 'CodeCraft platformasi talabasi',
+      bioRu: isAdminNumber ? 'Главный администратор платформы CodeCraft' : 'Студент платформы CodeCraft',
+      specialtyUz: isAdminNumber ? 'Bosh Boshqaruvchi' : 'Talaba',
+      specialtyRu: isAdminNumber ? 'Главный Администратор' : 'Студент',
       blocked: false,
       createdAt: new Date().toISOString()
     };
@@ -823,8 +861,8 @@ export function AppProvider({ children }) {
       draft.notifications.unshift({
         id: `notif-${Date.now()}`,
         userId: newUser.id,
-        textUz: `Xush kelibsiz, ${newUser.name}! EduCenter platformasida muvaffaqiyatli ro'yxatdan o'tdingiz.`,
-        textRu: `Добро пожаловать, ${newUser.name}! Вы успешно зарегистрировались на платформе EduCenter.`,
+        textUz: `Xush kelibsiz, ${newUser.name}! CodeCraft platformasida muvaffaqiyatli ro'yxatdan o'tdingiz.`,
+        textRu: `Добро пожаловать, ${newUser.name}! Вы успешно зарегистрировались на платформе CodeCraft.`,
         read: false,
         createdAt: new Date().toISOString()
       });
@@ -832,27 +870,37 @@ export function AppProvider({ children }) {
     });
     setCurrentUser(newUser);
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser));
-    showToast(`${newUser.name}, muvaffaqiyatli ro'yxatdan o'tdingiz!`, 'success');
-    const targetRedirect = route.params?.redirect || 'courses';
-    setRoute({ page: targetRedirect, params: route.params || {} });
+    showToast(lang === 'ru' ? `${newUser.name}, регистрация успешна!` : `${newUser.name}, muvaffaqiyatli ro'yxatdan o'tdingiz!`, 'success');
+
+    if (!skipRedirect) {
+      const targetRedirect = route.params?.redirect || (newUser.role === 'admin' ? 'admin' : 'courses');
+      setRoute({ page: targetRedirect, params: route.params || {} });
+    }
     return { ok: true, user: newUser };
   }
 
-  function resetPassword({ identifier, newPassword }) {
-    const clean = identifier.trim().toLowerCase();
+  function resetPassword({ phone, identifier, newPassword }) {
+    const clean = (phone || identifier || '').trim().toLowerCase();
+    const normalizedDigits = clean.replace(/\D/g, '');
+
     const target = db.users.find(
-      (u) => u.email?.toLowerCase() === clean || u.phone?.replace(/\s+/g, '') === clean.replace(/\s+/g, '')
+      (u) =>
+        (u.phone && u.phone.replace(/\D/g, '') === normalizedDigits) ||
+        (u.email && u.email.toLowerCase() === clean)
     );
     if (!target) {
-      return { ok: false, error: t.auth.errors.invalidCreds };
+      return { ok: false, error: lang === 'ru' ? 'Пользователь не найден' : 'Foydalanuvchi topilmadi' };
     }
+    if (!newPassword || newPassword.length < 6) {
+      return { ok: false, error: t.auth.errors.passwordMin };
+    }
+
     updateDb((draft) => {
       const u = draft.users.find((x) => x.id === target.id);
       if (u) u.passwordHash = newPassword;
       return draft;
     });
-    showToast('Parol muvaffaqiyatli yangilandi! Endi tizimga kirishingiz mumkin.', 'success');
-    setRoute({ page: 'login', params: {} });
+    showToast(lang === 'ru' ? 'Пароль успешно обновлен!' : 'Parol muvaffaqiyatli yangilandi!', 'success');
     return { ok: true };
   }
 

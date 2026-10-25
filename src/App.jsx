@@ -42,8 +42,11 @@ function AppRouter() {
       case 'terms':
         return <StaticContentPage slug="terms" />;
       case 'login':
-      case 'register':
         return currentUser ? <CoursesCatalogPage /> : <AuthPage mode="login" />;
+      case 'register':
+        return currentUser ? <CoursesCatalogPage /> : <AuthPage mode="register" />;
+      case 'resetPassword':
+        return currentUser ? <CoursesCatalogPage /> : <AuthPage mode="reset" />;
       case 'dashboard':
         return <StudentDashboardPage />;
       case 'learning':

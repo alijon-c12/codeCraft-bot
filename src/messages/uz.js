@@ -117,9 +117,9 @@ export const uz = {
   },
   auth: {
     loginTitle: "Tizimga kirish",
-    loginSub: "Ism familiyangiz va telefon raqamingiz orqali SMS kod bilan kiring",
+    loginSub: "Telefon raqamingiz va parolingiz orqali tizimga kiring",
     registerTitle: "Ro'yxatdan o'tish",
-    registerSub: "EduCenter platformasida yangi hisob yarating",
+    registerSub: "Ism familiyangiz, telefoningiz va xavfsiz parol bilan yangi hisob yarating",
     resetTitle: "Parolni tiklash",
     resetSub: "Email yoki telefon raqamingizni kiriting va yangi parol o'rnating",
     nameLabel: "To'liq ismingiz",

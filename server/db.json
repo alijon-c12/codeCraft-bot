@@ -13,7 +13,7 @@
       "specialtyRu": "Главный Администратор",
       "blocked": false,
       "createdAt": "2026-10-22T15:58:09.770Z",
-      "passwordHash": "sms_verified"
+      "passwordHash": "admin123"
     },
     {
       "id": "usr-1792831353065",
@@ -29,6 +29,21 @@
       "blocked": false,
       "createdAt": "2026-10-24T08:42:33.065Z",
       "passwordHash": "sms_verified"
+    },
+    {
+      "id": "usr-1792913450364",
+      "name": "Alibek",
+      "email": "",
+      "phone": "+998 50 117 81 92",
+      "passwordHash": "sms_verified",
+      "role": "student",
+      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
+      "bioUz": "CodeCraft platformasi talabasi",
+      "bioRu": "Студент платформы CodeCraft",
+      "specialtyUz": "Talaba",
+      "specialtyRu": "Студент",
+      "blocked": false,
+      "createdAt": "2026-10-25T07:30:50.364Z"
     }
   ],
   "categories": [
@@ -1373,6 +1388,21 @@
     }
   ],
   "notificationLogs": [
+    {
+      "id": "nlog-1792913450364",
+      "channel": "SMS_GATEWAY",
+      "recipient": "+998 50 117 81 92",
+      "message": "Xush kelibsiz! CodeCraft platformasiga muvaffaqiyatli kirdingiz (Alibek).",
+      "createdAt": "2026-10-25T07:30:50.364Z"
+    },
+    {
+      "id": "sms-1792913435888",
+      "channel": "SMS_GATEWAY",
+      "recipient": "+998 50 117 81 92",
+      "message": "CodeCraft platformasiga kirish uchun tasdiqlash kodi: 5610. Kodni hech kimga bermang!",
+      "status": "sent",
+      "createdAt": "2026-10-25T07:30:35.888Z"
+    },
     {
       "id": "nlog-1792912059784",
       "channel": "TELEGRAM",
