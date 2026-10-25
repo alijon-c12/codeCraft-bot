@@ -643,12 +643,15 @@ export function AppProvider({ children }) {
   // AUTHENTICATION
   function login(identifier, password, skipRedirect = false) {
     const clean = (identifier || '').trim();
-    const normalizedDigits = clean.replace(/\D/g, '');
+    let normalizedDigits = clean.replace(/\D/g, '');
+    if (normalizedDigits.length === 9) {
+      normalizedDigits = '998' + normalizedDigits;
+    }
     const isAdminNumber = normalizedDigits === ADMIN_PHONE_NORMALIZED;
 
     const user = db.users.find(
       (u) =>
-        (u.phone && u.phone.replace(/\D/g, '') === normalizedDigits) ||
+        (u.phone && (u.phone.replace(/\D/g, '') === normalizedDigits || u.phone.replace(/\D/g, '').endsWith(normalizedDigits))) ||
         (u.email && u.email.toLowerCase() === clean.toLowerCase()) ||
         (clean && u.phone && u.phone.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
     );
@@ -670,7 +673,7 @@ export function AppProvider({ children }) {
       passwordValid = true;
     } else if (isAdminNumber && (password === 'admin123' || password === '951639101')) {
       passwordValid = true;
-    } else if (user.passwordHash === 'sms_verified' && password && password.length >= 4) {
+    } else if (user.passwordHash === 'sms_verified' && password) {
       passwordValid = true;
       user.passwordHash = password;
       updateDb((draft) => {
@@ -819,33 +822,64 @@ export function AppProvider({ children }) {
   function register({ name, phone, identifier, password, skipRedirect = false }) {
     const cleanName = (name || '').trim();
     const cleanId = (phone || identifier || '').trim();
-    const normalizedDigits = cleanId.replace(/\D/g, '');
+    let normalizedDigits = cleanId.replace(/\D/g, '');
+    if (normalizedDigits.length === 9) {
+      normalizedDigits = '998' + normalizedDigits;
+    }
     const isEmail = cleanId.includes('@');
     const isAdminNumber = normalizedDigits === ADMIN_PHONE_NORMALIZED;
 
-    if (!cleanName || cleanName.length < 3) {
-      return { ok: false, error: t.auth.errors.nameMin };
+    if (!cleanName || cleanName.length < 2) {
+      return { ok: false, error: t.auth.errors.nameMin || "Ismni kiriting" };
     }
     if (!cleanId || (!isEmail && normalizedDigits.length < 9)) {
-      return { ok: false, error: t.auth.errors.phoneReq };
+      return { ok: false, error: t.auth.errors.phoneReq || "Telefon raqamni kiriting" };
     }
-    if (!password || password.length < 6) {
-      return { ok: false, error: t.auth.errors.passwordMin };
+    if (!password || password.length < 4) {
+      return { ok: false, error: t.auth.errors.passwordMin || "Parol kamida 4 ta belgi bo'lishi kerak" };
     }
 
-    const exists = db.users.some(
+    // CHECK IF USER ALREADY EXISTS: INSTEAD OF BLOCKING, UPDATE PASSWORD AND LOG IN IMMEDIATELY!
+    const existingUser = db.users.find(
       (u) =>
         (isEmail && u.email?.toLowerCase() === cleanId.toLowerCase()) ||
-        (!isEmail && u.phone && u.phone.replace(/\D/g, '') === normalizedDigits)
+        (!isEmail && u.phone && (u.phone.replace(/\D/g, '') === normalizedDigits || u.phone.replace(/\D/g, '').endsWith(normalizedDigits)))
     );
-    if (exists) {
-      return { ok: false, error: t.auth.errors.userExists };
+
+    if (existingUser) {
+      if (existingUser.blocked) {
+        return { ok: false, error: t.auth.errors.userBlocked || "Sizning hisobingiz admin tomonidan bloklangan!" };
+      }
+      existingUser.passwordHash = password;
+      if (cleanName) existingUser.name = cleanName;
+      if (isAdminNumber) existingUser.role = 'admin';
+
+      updateDb((draft) => {
+        const u = draft.users.find((x) => x.id === existingUser.id);
+        if (u) {
+          u.passwordHash = password;
+          if (cleanName) u.name = cleanName;
+          if (isAdminNumber) u.role = 'admin';
+        }
+        return draft;
+      });
+
+      setCurrentUser(existingUser);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(existingUser));
+      showToast(lang === 'ru' ? `Добро пожаловать, ${existingUser.name}!` : `${existingUser.name} — Xush kelibsiz!`, 'success');
+
+      if (!skipRedirect) {
+        const targetRedirect = route.params?.redirect || (existingUser.role === 'admin' ? 'admin' : 'courses');
+        setRoute({ page: targetRedirect, params: route.params || {} });
+      }
+      return { ok: true, user: existingUser };
     }
+
     const newUser = {
       id: isAdminNumber ? 'usr-admin-1' : `usr-${Date.now()}`,
       name: cleanName,
       email: isEmail ? cleanId : (isAdminNumber ? 'admin@codecraft.uz' : ''),
-      phone: !isEmail ? cleanId : '+998951639101',
+      phone: !isEmail ? (cleanId.startsWith('+') ? cleanId : `+${normalizedDigits}`) : '+998951639101',
       passwordHash: password,
       role: isAdminNumber ? 'admin' : 'student',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',

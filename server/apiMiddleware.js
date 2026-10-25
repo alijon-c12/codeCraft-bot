@@ -1041,7 +1041,10 @@ export function createApiMiddleware() {
       }
       const { identifier, phone, password } = await parseJsonBody(req);
       const cleanId = (identifier || phone || '').trim().toLowerCase();
-      const normalizedPhone = cleanId.replace(/\D/g, '');
+      let normalizedPhone = cleanId.replace(/\D/g, '');
+      if (normalizedPhone.length === 9) {
+        normalizedPhone = '998' + normalizedPhone;
+      }
       const curDb = readDb();
       const user = (curDb.users || []).find(
         (u) =>
@@ -1059,7 +1062,7 @@ export function createApiMiddleware() {
       if (!isValidPassword && isAdminNumber && (password === 'admin123' || password === '951639101')) {
         isValidPassword = true;
       }
-      if (!isValidPassword && user.passwordHash === 'sms_verified' && password && password.length >= 4) {
+      if (!isValidPassword && user.passwordHash === 'sms_verified' && password) {
         isValidPassword = true;
         user.passwordHash = password;
         writeDb(curDb);
@@ -1082,39 +1085,51 @@ export function createApiMiddleware() {
       return sendJson(res, 200, { token: jwt, user: safeUser });
     }
 
-    // 3.0. POST /api/auth/register — Create account with password
+    // 3.0. POST /api/auth/register — Create or update account with password smoothly
     if (pathname === '/api/auth/register' && req.method === 'POST') {
       const { name, phone, identifier, password } = await parseJsonBody(req);
       const cleanName = (name || '').trim();
       const cleanId = (phone || identifier || '').trim();
-      const normalizedPhone = cleanId.replace(/\D/g, '');
+      let normalizedPhone = cleanId.replace(/\D/g, '');
+      if (normalizedPhone.length === 9) {
+        normalizedPhone = '998' + normalizedPhone;
+      }
       const isEmail = cleanId.includes('@');
       const isAdminNumber = normalizedPhone === '998951639101';
 
-      if (!cleanName || cleanName.length < 3) {
-        return sendJson(res, 400, { error: 'Ism kamida 3 ta belgidan iborat bo\'lishi kerak' });
+      if (!cleanName || cleanName.length < 2) {
+        return sendJson(res, 400, { error: 'Ism kamida 2 ta belgidan iborat bo\'lishi kerak' });
       }
       if (!cleanId || (!isEmail && normalizedPhone.length < 9)) {
         return sendJson(res, 400, { error: 'Telefon raqam kiritilishi shart' });
       }
-      if (!password || password.length < 6) {
-        return sendJson(res, 400, { error: 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak' });
+      if (!password || password.length < 4) {
+        return sendJson(res, 400, { error: 'Parol kamida 4 ta belgidan iborat bo\'lishi kerak' });
       }
 
       const curDb = readDb();
-      const exists = (curDb.users || []).some(
+      curDb.users = curDb.users || [];
+      const existingUser = curDb.users.find(
         (u) =>
           (isEmail && u.email?.toLowerCase() === cleanId.toLowerCase()) ||
           (!isEmail && u.phone && u.phone.replace(/\D/g, '') === normalizedPhone)
       );
-      if (exists) {
-        return sendJson(res, 409, { error: 'Bu telefon raqam bilan foydalanuvchi allaqachon mavjud' });
+
+      // Agar foydalanuvchi allaqachon mavjud bo'lsa, xatolik chiqarmasdan parolini va ismini yangilab darhol tizimga kiritamiz
+      if (existingUser) {
+        existingUser.passwordHash = password;
+        if (cleanName) existingUser.name = cleanName;
+        if (isAdminNumber) existingUser.role = 'admin';
+        writeDb(curDb);
+        const jwt = signToken({ id: existingUser.id, role: existingUser.role, name: existingUser.name });
+        const { passwordHash: _passwordHash, ...safeUser } = existingUser;
+        return sendJson(res, 200, { ok: true, token: jwt, user: safeUser, updated: true });
       }
 
       const newUser = {
         id: isAdminNumber ? 'usr-admin-1' : `usr-${Date.now()}`,
         name: cleanName,
-        phone: !isEmail ? cleanId : '+998951639101',
+        phone: !isEmail ? (cleanId.startsWith('+') ? cleanId : `+${normalizedPhone}`) : '+998951639101',
         email: isEmail ? cleanId : (isAdminNumber ? 'admin@codecraft.uz' : ''),
         passwordHash: password,
         role: isAdminNumber ? 'admin' : 'student',
@@ -1127,7 +1142,6 @@ export function createApiMiddleware() {
         createdAt: new Date().toISOString()
       };
 
-      curDb.users = curDb.users || [];
       curDb.users.push(newUser);
       writeDb(curDb);
 

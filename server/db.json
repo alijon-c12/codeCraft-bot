@@ -17,9 +17,9 @@
     },
     {
       "id": "usr-1792831353065",
-      "name": "Clent",
+      "name": "Alibek Abdunabiyev",
       "email": "",
-      "phone": "+998 50 1178192",
+      "phone": "+998 50 117 81 92",
       "role": "student",
       "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
       "bioUz": "CodeCraft platformasi talabasi",
@@ -28,22 +28,7 @@
       "specialtyRu": "Студент",
       "blocked": false,
       "createdAt": "2026-10-24T08:42:33.065Z",
-      "passwordHash": "sms_verified"
-    },
-    {
-      "id": "usr-1792913450364",
-      "name": "Alibek",
-      "email": "",
-      "phone": "+998 50 117 81 92",
-      "passwordHash": "sms_verified",
-      "role": "student",
-      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
-      "bioUz": "CodeCraft platformasi talabasi",
-      "bioRu": "Студент платформы CodeCraft",
-      "specialtyUz": "Talaba",
-      "specialtyRu": "Студент",
-      "blocked": false,
-      "createdAt": "2026-10-25T07:30:50.364Z"
+      "passwordHash": "20122209"
     }
   ],
   "categories": [
@@ -78,36 +63,13 @@
   ],
   "courses": [
     {
-      "id": "crs-1792861528419",
-      "titleUz": "xcvc",
-      "titleRu": "dvb vcd",
-      "slug": "xcvc",
-      "descriptionUz": "fvbvfdc",
-      "descriptionRu": "fvbvfdc",
-      "price": 1500000,
-      "discountPrice": null,
-      "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "level": "beginner",
-      "language": "O'zbek / Русский",
-      "status": "published",
-      "teacherId": "usr-teacher-1",
-      "categoryId": "cat-frontend",
-      "durationHours": 40,
-      "studentsCount": 1,
-      "rating": 5,
-      "createdAt": "2026-10-24T17:05:28.419Z"
-    },
-    {
       "id": "crs-1792907963578",
       "titleUz": "Reactga kirish",
       "titleRu": "Reactga kirish",
       "slug": "reactga-kirish",
       "descriptionUz": "React bu dasturlash  texlonogiyasi bolib u 2012-yilda meta tomonidan yaratilgan.",
       "descriptionRu": "React bu dasturlash  texlonogiyasi bolib u 2012-yilda meta tomonidan yaratilgan.",
-      "price": 200000,
+      "price": "100000",
       "discountPrice": null,
       "thumbnail": "https://www.google.com/imgres?q=react&imgurl=https%3A%2F%2Fmiro.medium.com%2F1*NJSv6DGoKTloI8d8im98zg.png&imgrefurl=https%3A%2F%2Fmedium.com%2F%40msk00256%2Fwhat-is-react-how-does-it-actually-work-a1f1b0bc7d4d&docid=MwNGGuOV6NF_XM&tbnid=2Fz6LCgtj8OEnM&vet=12ahUKEwiYgojIvtSXAxX0HxAIHR6eFykQnPAOegQIfxAA..i&w=522&h=343&hcb=2&ved=2ahUKEwiYgojIvtSXAxX0HxAIHR6eFykQnPAOegQIfxAA",
       "videoUrl": "/api/media/vid-crs-1792907928041",
@@ -126,13 +88,6 @@
   ],
   "modules": [
     {
-      "id": "mod-1792861528419",
-      "courseId": "crs-1792861528419",
-      "titleUz": "1-modul: Darslar va Amaliyot",
-      "titleRu": "Модуль 1: Уроки и практика",
-      "order": 1
-    },
-    {
       "id": "mod-1792907963579",
       "courseId": "crs-1792907963578",
       "titleUz": "1-modul: Darslar va Amaliyot",
@@ -141,23 +96,6 @@
     }
   ],
   "lessons": [
-    {
-      "id": "les-1792861528419",
-      "moduleId": "mod-1792861528419",
-      "titleUz": "1.1. Kurs bilan tanishuv",
-      "titleRu": "1.1. Знакомство с курсом",
-      "type": "text",
-      "videoUrl": "",
-      "videoName": "",
-      "videoId": "",
-      "contentUz": "fvbvfdc",
-      "contentRu": "fvbvfdc",
-      "duration": 20,
-      "order": 1,
-      "isFree": false,
-      "attachmentName": "Kurs_Dasturi.pdf",
-      "attachmentUrl": "#download"
-    },
     {
       "id": "les-1792907963579",
       "moduleId": "mod-1792907963579",
@@ -387,13 +325,6 @@
       "courseId": "all",
       "status": "active",
       "createdAt": "2026-10-24T17:09:36.348Z"
-    },
-    {
-      "id": "enr-1792908012019-crs-1792861528419",
-      "userId": "usr-1792831353065",
-      "courseId": "crs-1792861528419",
-      "status": "active",
-      "createdAt": "2026-10-25T06:00:12.019Z"
     },
     {
       "id": "enr-all-1792908012019",
@@ -627,7 +558,7 @@
       "questionUz": "Kurs yakunida sertifikat beriladimi?",
       "questionRu": "Выдаётся ли сертификат по окончании кур��а?",
       "answerUz": "Ha! Kursdagi barcha darslarni 100% yakunlaganingizda tizim avtomatik ravishda noyob ID-kodli rasmiy PDF sertifikat yaratadi. Uning haqiqiyligini istalgan ish beruvchi saytimizda tekshirishi mumkin.",
-      "answerRu": "Да! ��осле прохождения 100% уроков курса система автоматически генерирует именной сертификат с уникальным кодом проверки подлинности.",
+      "answerRu": "Да! ��осле прохождения 100% уроков курса система автоматически ге����рирует именной сертификат с уникальным кодом проверки подлинности.",
       "order": 4
     }
   ],
@@ -658,6 +589,22 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1792915035455",
+      "userId": "usr-admin-1",
+      "userName": "admin",
+      "action": "COURSE_UPDATED",
+      "details": "Kurs saqlandi: Reactga kirish",
+      "createdAt": "2026-10-25T07:57:15.455Z"
+    },
+    {
+      "id": "aud-1792915023866",
+      "userId": "usr-admin-1",
+      "userName": "admin",
+      "action": "COURSE_DELETED",
+      "details": "Kurs (crs-1792861528419) butunlay o'chirildi",
+      "createdAt": "2026-10-25T07:57:03.866Z"
+    },
     {
       "id": "aud-1792911635954",
       "userId": "usr-1792831353065",
@@ -1602,7 +1549,8 @@
     "crs-1792834891606",
     "crs-1792834891654",
     "crs-1792848610891",
-    "crs-1792848899550"
+    "crs-1792848899550",
+    "crs-1792861528419"
   ],
   "deletedEnrollmentIds": [
     "enr-all-1792834703539",
