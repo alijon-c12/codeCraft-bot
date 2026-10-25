@@ -27,7 +27,6 @@ export function Navbar() {
       ]
     : [
         { id: 'home', label: t.nav.home },
-        { id: 'teachers', label: t.nav.teachers },
         { id: 'about', label: t.nav.about },
         { id: 'contact', label: t.nav.contact }
       ];

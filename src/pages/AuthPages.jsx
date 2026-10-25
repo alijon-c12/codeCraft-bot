@@ -74,7 +74,7 @@ export function AuthPage({ mode = 'login' }) {
 
     setLoading(true);
     try {
-      const res = login(phone.trim(), password);
+      const res = await login(phone.trim(), password);
       if (!res.ok) {
         setError(res.error || t.auth.errors.invalidCreds);
       }
@@ -110,7 +110,7 @@ export function AuthPage({ mode = 'login' }) {
     setLoading(true);
     try {
       // register() creates a new account OR smoothly updates existing user without throwing errors
-      const res = register({
+      const res = await register({
         name: name.trim(),
         phone: phone.trim(),
         password: password

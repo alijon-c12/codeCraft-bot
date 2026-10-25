@@ -641,17 +641,53 @@ export function AppProvider({ children }) {
   }
 
   // AUTHENTICATION
-  function login(identifier, password, skipRedirect = false) {
+  async function login(identifier, password, skipRedirect = false) {
     const clean = (identifier || '').trim();
     let normalizedDigits = clean.replace(/\D/g, '');
     if (normalizedDigits.length === 9) {
       normalizedDigits = '998' + normalizedDigits;
     }
     const isAdminNumber = normalizedDigits === ADMIN_PHONE_NORMALIZED;
+    const cleanPassword = String(password || '').trim();
 
+    // 1. Call Backend API /api/auth/login for reliable database authentication
+    try {
+      const apiRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: clean,
+          identifier: clean,
+          password: cleanPassword
+        })
+      });
+      const apiData = await apiRes.json().catch(() => ({}));
+      if (apiRes.ok && apiData && apiData.user) {
+        let authUser = apiData.user;
+        if (isAdminNumber) {
+          authUser.role = 'admin';
+        }
+        setCurrentUser(authUser);
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
+        showToast(lang === 'ru' ? `Добро пожаловать, ${authUser.name}!` : `${authUser.name} — Xush kelibsiz!`, 'success');
+
+        if (!skipRedirect) {
+          const targetRedirect = route.params?.redirect || (authUser.role === 'admin' ? 'admin' : 'courses');
+          setRoute({ page: targetRedirect, params: route.params || {} });
+        }
+        return { ok: true, user: authUser };
+      }
+      if (apiRes.status === 403) {
+        return { ok: false, error: t.auth.errors.userBlocked || "Sizning hisobingiz admin tomonidan bloklangan!" };
+      }
+    } catch (err) {
+      console.warn('Backend login fallback to local:', err);
+    }
+
+    // 2. Local fallback verification
     const user = db.users.find(
       (u) =>
-        (u.phone && (u.phone.replace(/\D/g, '') === normalizedDigits || u.phone.replace(/\D/g, '').endsWith(normalizedDigits))) ||
+        (u.phone && (u.phone.replace(/\D/g, '') === normalizedDigits || u.phone.replace(/\D/g, '').endsWith(normalizedDigits.slice(-9)))) ||
         (u.email && u.email.toLowerCase() === clean.toLowerCase()) ||
         (clean && u.phone && u.phone.replace(/\s+/g, '') === clean.replace(/\s+/g, ''))
     );
@@ -664,21 +700,17 @@ export function AppProvider({ children }) {
       return { ok: false, error: t.auth.errors.userBlocked || "Sizning hisobingiz admin tomonidan bloklangan!" };
     }
 
-    // Password verification logic:
-    // 1. Direct match with stored passwordHash
-    // 2. Default admin password: if admin number, accept 'admin123'
-    // 3. For existing users whose passwordHash was 'sms_verified', accept password and save it
     let passwordValid = false;
-    if (user.passwordHash && user.passwordHash === password) {
+    if (isAdminNumber && (cleanPassword === 'admin123' || cleanPassword === '951639101')) {
       passwordValid = true;
-    } else if (isAdminNumber && (password === 'admin123' || password === '951639101')) {
+    } else if (user.passwordHash && String(user.passwordHash).trim() === cleanPassword) {
       passwordValid = true;
-    } else if (user.passwordHash === 'sms_verified' && password) {
+    } else if (!user.passwordHash || user.passwordHash === 'sms_verified') {
       passwordValid = true;
-      user.passwordHash = password;
+      user.passwordHash = cleanPassword;
       updateDb((draft) => {
         const u = draft.users.find((x) => x.id === user.id);
-        if (u) u.passwordHash = password;
+        if (u) u.passwordHash = cleanPassword;
         return draft;
       });
     }
@@ -687,7 +719,6 @@ export function AppProvider({ children }) {
       return { ok: false, error: t.auth.errors.invalidCreds };
     }
 
-    // Ensure admin role for official admin number
     if (isAdminNumber) {
       user.role = 'admin';
     }
@@ -819,7 +850,7 @@ export function AppProvider({ children }) {
     }
   }, [db.users, currentUser]);
 
-  function register({ name, phone, identifier, password, skipRedirect = false }) {
+  async function register({ name, phone, identifier, password, skipRedirect = false }) {
     const cleanName = (name || '').trim();
     const cleanId = (phone || identifier || '').trim();
     let normalizedDigits = cleanId.replace(/\D/g, '');
@@ -828,6 +859,7 @@ export function AppProvider({ children }) {
     }
     const isEmail = cleanId.includes('@');
     const isAdminNumber = normalizedDigits === ADMIN_PHONE_NORMALIZED;
+    const cleanPassword = String(password || '').trim();
 
     if (!cleanName || cleanName.length < 2) {
       return { ok: false, error: t.auth.errors.nameMin || "Ismni kiriting" };
@@ -835,29 +867,68 @@ export function AppProvider({ children }) {
     if (!cleanId || (!isEmail && normalizedDigits.length < 9)) {
       return { ok: false, error: t.auth.errors.phoneReq || "Telefon raqamni kiriting" };
     }
-    if (!password || password.length < 4) {
+    if (!cleanPassword || cleanPassword.length < 4) {
       return { ok: false, error: t.auth.errors.passwordMin || "Parol kamida 4 ta belgi bo'lishi kerak" };
     }
 
-    // CHECK IF USER ALREADY EXISTS: INSTEAD OF BLOCKING, UPDATE PASSWORD AND LOG IN IMMEDIATELY!
+    // 1. Call backend API /api/auth/register so db.json is immediately saved
+    try {
+      const apiRes = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cleanName,
+          phone: cleanId,
+          password: cleanPassword
+        })
+      });
+      const apiData = await apiRes.json().catch(() => ({}));
+      if (apiRes.ok && apiData && apiData.user) {
+        let authUser = apiData.user;
+        if (isAdminNumber) authUser.role = 'admin';
+        setCurrentUser(authUser);
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
+
+        setDb((prev) => {
+          const users = prev.users || [];
+          const exists = users.find((u) => u.id === authUser.id);
+          const nextUsers = exists
+            ? users.map((u) => (u.id === authUser.id ? { ...u, ...authUser, passwordHash: cleanPassword } : u))
+            : [...users, { ...authUser, passwordHash: cleanPassword }];
+          return { ...prev, users: nextUsers };
+        });
+
+        showToast(lang === 'ru' ? `${authUser.name}, регистрация успешна!` : `${authUser.name}, muvaffaqiyatli ro'yxatdan o'tdingiz!`, 'success');
+
+        if (!skipRedirect) {
+          const targetRedirect = route.params?.redirect || (authUser.role === 'admin' ? 'admin' : 'courses');
+          setRoute({ page: targetRedirect, params: route.params || {} });
+        }
+        return { ok: true, user: authUser };
+      }
+    } catch (err) {
+      console.warn('Backend register error fallback:', err);
+    }
+
+    // 2. Local fallback registration or update
     const existingUser = db.users.find(
       (u) =>
         (isEmail && u.email?.toLowerCase() === cleanId.toLowerCase()) ||
-        (!isEmail && u.phone && (u.phone.replace(/\D/g, '') === normalizedDigits || u.phone.replace(/\D/g, '').endsWith(normalizedDigits)))
+        (!isEmail && u.phone && (u.phone.replace(/\D/g, '') === normalizedDigits || u.phone.replace(/\D/g, '').endsWith(normalizedDigits.slice(-9))))
     );
 
     if (existingUser) {
       if (existingUser.blocked) {
         return { ok: false, error: t.auth.errors.userBlocked || "Sizning hisobingiz admin tomonidan bloklangan!" };
       }
-      existingUser.passwordHash = password;
+      existingUser.passwordHash = cleanPassword;
       if (cleanName) existingUser.name = cleanName;
       if (isAdminNumber) existingUser.role = 'admin';
 
       updateDb((draft) => {
         const u = draft.users.find((x) => x.id === existingUser.id);
         if (u) {
-          u.passwordHash = password;
+          u.passwordHash = cleanPassword;
           if (cleanName) u.name = cleanName;
           if (isAdminNumber) u.role = 'admin';
         }
@@ -880,7 +951,7 @@ export function AppProvider({ children }) {
       name: cleanName,
       email: isEmail ? cleanId : (isAdminNumber ? 'admin@codecraft.uz' : ''),
       phone: !isEmail ? (cleanId.startsWith('+') ? cleanId : `+${normalizedDigits}`) : '+998951639101',
-      passwordHash: password,
+      passwordHash: cleanPassword,
       role: isAdminNumber ? 'admin' : 'student',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
       bioUz: isAdminNumber ? "CodeCraft platformasi bosh administratori va tizim to'liq nazoratchisi" : 'CodeCraft platformasi talabasi',

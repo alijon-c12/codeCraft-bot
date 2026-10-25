@@ -28,9 +28,8 @@ function AppRouter() {
       case 'courseDetail':
         return currentUser ? <CourseDetailPage /> : <AuthPage mode="login" />;
       case 'teachers':
-        return currentUser ? <CoursesCatalogPage /> : <TeachersPage />;
       case 'teacherProfile':
-        return currentUser ? <CoursesCatalogPage /> : <TeacherProfilePage />;
+        return currentUser ? <CoursesCatalogPage /> : <HomePage />;
       case 'verifyCert':
         return currentUser ? <CoursesCatalogPage /> : <HomePage />;
       case 'about':

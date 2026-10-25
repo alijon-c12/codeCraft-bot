@@ -27,7 +27,6 @@ export function Footer() {
             {currentUser && (
               <li><button onClick={() => navigate('courses')}>{t.nav.courses}</button></li>
             )}
-            <li><button onClick={() => navigate('teachers')}>{t.nav.teachers}</button></li>
             <li><button onClick={() => navigate('about')}>{t.nav.about}</button></li>
             <li><button onClick={() => navigate('contact')}>{t.nav.contact}</button></li>
           </ul>
